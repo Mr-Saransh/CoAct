@@ -4,10 +4,10 @@ const { Server } = require('socket.io')
 
 const port = parseInt(process.env.PORT || '3000', 10)
 const dev = process.env.NODE_ENV !== 'production'
-const hostname = 'localhost'
+const hostname = '0.0.0.0'
 const server = createServer()
 const path = require('path')
-const app = next({ dev, dir: __dirname })
+const app = next({ dev, dir: __dirname, hostname, port })
 const handle = app.getRequestHandler()
 
 
@@ -943,5 +943,9 @@ app.prepare().then(() => {
     })
   })
 
-  server.listen(port, () => console.log(`> Ready on http://localhost:${port}`))
+  const host = '0.0.0.0'
+  server.listen(port, host, (err) => {
+    if (err) throw err
+    console.log(`> Ready on http://${host}:${port}`)
+  })
 })
