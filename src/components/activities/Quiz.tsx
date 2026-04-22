@@ -18,6 +18,8 @@ export function QuizHost({ session, updateActivity }: { session: any; updateActi
   const [questions, setQuestions] = useState<any[]>(activityData.questions?.length ? activityData.questions : [
     { q: "", options: ["", ""], correct: 0 }
   ]);
+  const [isTeamMode, setIsTeamMode] = useState(activityData.isTeamMode || false);
+  const [numTeams, setNumTeams] = useState(activityData.numTeams || 2);
 
   const handlePublish = () => {
     // Validate
@@ -29,7 +31,9 @@ export function QuizHost({ session, updateActivity }: { session: any; updateActi
       currentQuestionIndex: 0,
       state: "question",
       scores: {},
-      answers: {}
+      answers: {},
+      isTeamMode,
+      numTeams
     }, "live");
   };
 
@@ -64,14 +68,54 @@ export function QuizHost({ session, updateActivity }: { session: any; updateActi
   if (isEditing) {
     return (
       <div className="p-8 flex flex-col max-w-3xl mx-auto space-y-6 pb-24">
-        <div className="text-center mb-4">
-          <h2 className="text-3xl font-outfit font-bold">Quiz Editor</h2>
-          <p className="text-muted-foreground">Create your questions and mark the correct answers.</p>
+        <div className="text-center mb-10">
+          <div className="w-20 h-20 bg-yellow-500/10 border border-yellow-500/20 rounded-3xl flex items-center justify-center mx-auto mb-6 shadow-[0_0_40px_rgba(250,204,21,0.2)]">
+            <Trophy className="w-10 h-10 text-yellow-500" />
+          </div>
+          <h2 className="text-5xl font-black italic tracking-tighter mb-4">Quiz Battle</h2>
+          <p className="text-white/40 uppercase font-bold tracking-widest text-xs">Configure your questions and modes</p>
         </div>
 
+        <Card className="border-white/10 bg-[#121826]/80 backdrop-blur-xl rounded-[2rem] overflow-hidden">
+          <CardContent className="p-8 space-y-6">
+            <h3 className="text-xl font-black italic">Game Mode</h3>
+            <div className="flex gap-4">
+              <Button 
+                onClick={() => setIsTeamMode(false)}
+                className={`flex-1 h-14 rounded-xl text-sm font-black uppercase tracking-widest ${!isTeamMode ? 'bg-primary text-black' : 'bg-white/5 text-white/40 border border-white/10'}`}
+              >
+                Solo Mode
+              </Button>
+              <Button 
+                onClick={() => setIsTeamMode(true)}
+                className={`flex-1 h-14 rounded-xl text-sm font-black uppercase tracking-widest ${isTeamMode ? 'bg-yellow-500 text-black' : 'bg-white/5 text-white/40 border border-white/10'}`}
+              >
+                Team Mode ⭐
+              </Button>
+            </div>
+            
+            {isTeamMode && (
+              <div className="space-y-4 pt-4 border-t border-white/10">
+                <label className="text-xs font-black uppercase tracking-widest text-white/60">Number of Teams (2-6)</label>
+                <div className="flex items-center gap-4">
+                  {[2,3,4,5,6].map(num => (
+                    <Button 
+                      key={num}
+                      onClick={() => setNumTeams(num)}
+                      className={`w-12 h-12 rounded-xl text-lg font-black ${numTeams === num ? 'bg-yellow-500 text-black' : 'bg-white/5 text-white/40'}`}
+                    >
+                      {num}
+                    </Button>
+                  ))}
+                </div>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+
         {questions.map((q, qIndex) => (
-          <Card key={qIndex} className="border-white/10 bg-black/40 backdrop-blur-xl">
-            <CardContent className="pt-6 space-y-4">
+          <Card key={qIndex} className="border-white/10 bg-[#121826]/80 backdrop-blur-xl rounded-[2rem] overflow-hidden">
+            <CardContent className="p-8 space-y-4">
               <div className="flex items-center justify-between">
                 <label className="text-sm font-medium text-primary">Question {qIndex + 1}</label>
                 {questions.length > 1 && (
@@ -134,9 +178,9 @@ export function QuizHost({ session, updateActivity }: { session: any; updateActi
           <Plus className="w-4 h-4 mr-2" /> Add New Question
         </Button>
 
-        <div className="fixed bottom-0 left-0 right-0 p-4 bg-black/60 backdrop-blur-xl border-t border-white/10 flex justify-center z-10">
-          <Button onClick={handlePublish} className="w-full max-w-md bg-primary text-primary-foreground h-12 text-lg">
-            <Play className="w-5 h-5 mr-2" /> Start Quiz
+        <div className="fixed bottom-0 left-0 right-0 p-4 bg-[#020617]/80 backdrop-blur-xl border-t border-white/5 flex justify-center z-10">
+          <Button onClick={handlePublish} className="w-full max-w-md bg-yellow-500 hover:bg-yellow-600 text-black font-black uppercase tracking-widest h-14 rounded-2xl text-sm shadow-[0_0_20px_rgba(250,204,21,0.4)]">
+            <Play className="w-5 h-5 mr-2" /> Start Quiz Battle
           </Button>
         </div>
       </div>

@@ -353,8 +353,8 @@ export function ThinkingBoard({
       </div>
 
       {isHost && (
-        <div className="absolute bottom-3 left-3 z-20 bg-black/60 backdrop-blur-md border border-white/10 rounded-xl p-3 w-[320px] max-w-[calc(100%-24px)]">
-          <p className="text-xs font-bold mb-2">Host Controls</p>
+        <div className="absolute bottom-3 left-3 z-20 bg-black/60 backdrop-blur-md border border-white/10 rounded-xl p-3 w-full max-w-[280px] md:max-w-[320px]">
+          <p className="text-[10px] md:text-xs font-bold mb-2 uppercase tracking-widest text-white/40">Host Controls</p>
           <div className="flex gap-2 mb-2">
             <button
               onClick={() => socket.emit("board:set_config", { sessionId, mode: "live", livePermission, allowedUsers: selectedUsers })}

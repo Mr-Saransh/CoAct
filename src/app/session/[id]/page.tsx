@@ -1,6 +1,7 @@
 "use client";
 
 import { Suspense, useState, useEffect, useCallback } from "react";
+import Image from "next/image";
 import { useParams, useSearchParams } from "next/navigation";
 import { useSession } from "@/hooks/useSession";
 import { useSocket } from "@/components/providers/SocketProvider";
@@ -22,6 +23,13 @@ import { UnoParticipant } from "@/components/activities/UnoGame";
 import { LudoParticipant } from "@/components/activities/LudoGame";
 import { SessionControls } from "@/components/session/SessionControls";
 
+// New DECIDE components
+import { ThoughtMapParticipant } from "@/components/activities/ThoughtMap";
+import { CourtroomParticipant } from "@/components/activities/CourtroomMode";
+import { DuelDebateParticipant } from "@/components/activities/DuelDebate";
+import { DecisionEngineParticipant } from "@/components/activities/DecisionEngine";
+
+
 function LoadingSpinner() {
   return (
     <div className="w-10 h-10 border-4 border-primary/30 border-t-primary rounded-full animate-spin mx-auto" />
@@ -30,6 +38,19 @@ function LoadingSpinner() {
 
 function NameEntry({ sessionId, onJoin }: { sessionId: string; onJoin: (name: string) => void }) {
   const [name, setName] = useState("");
+
+  useEffect(() => {
+    const savedName = localStorage.getItem("coact_user_name");
+    if (savedName) setName(savedName);
+  }, []);
+
+  const handleJoin = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (name.trim()) {
+      localStorage.setItem("coact_user_name", name.trim());
+      onJoin(name.trim());
+    }
+  };
 
   return (
     <div className="min-h-[100dvh] flex items-center justify-center p-4 relative bg-[#020617] isolate">
@@ -47,7 +68,7 @@ function NameEntry({ sessionId, onJoin }: { sessionId: string; onJoin: (name: st
                 ID: {sessionId}
               </p>
             </div>
-            <form onSubmit={(e) => { e.preventDefault(); if (name.trim()) onJoin(name.trim()); }} className="space-y-4">
+            <form onSubmit={handleJoin} className="space-y-4">
               <Input
                 placeholder="Your Name"
                 className="bg-white/5 border-white/10 h-14 text-lg text-white"
@@ -76,27 +97,27 @@ function Lobby({ session, userName, socket }: {
 
   return (
     <div className="min-h-[100dvh] flex items-center justify-center p-4 relative bg-[#020617] isolate">
-      <div className="fixed inset-0 pointer-events-none -z-10 bg-[#020617]" />
+      <div className="fixed inset-0 pointer-events-none -z-10 bg-[#020617] bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-[#1e1b4b]/20 via-[#020617] to-[#020617]" />
 
-      <div className="w-full max-w-sm z-10 relative">
-        <Card className="border-white/10 bg-[#121826] shadow-2xl overflow-hidden text-white relative z-20 border-t-4 border-t-primary rounded-2xl">
-          <CardContent className="pt-8 pb-8 px-8 text-center">
-            <div className="w-16 h-16 rounded-full bg-gradient-to-br from-primary to-violet flex items-center justify-center mx-auto mb-5 shadow-lg">
-              <span className="text-2xl font-bold text-white">{userName[0].toUpperCase()}</span>
+      <div className="w-full max-w-md z-10 relative">
+        <Card className="border-white/5 bg-[#121826]/80 backdrop-blur-xl shadow-2xl overflow-hidden text-white relative z-20 rounded-[2rem]">
+          <CardContent className="p-10 text-center">
+            <div className="w-20 h-20 rounded-full bg-gradient-to-br from-primary to-violet-500 flex items-center justify-center mx-auto mb-6 shadow-[0_0_40px_rgba(0,212,255,0.3)]">
+              <span className="text-3xl font-black text-black">{userName[0].toUpperCase()}</span>
             </div>
 
-            <h2 className="text-2xl font-outfit font-bold mb-1">In Lobby 👋</h2>
-            <p className="text-white/40 text-sm mb-6 font-medium">
-              Waiting for <strong className="text-white">{session.hostName || "Host"}</strong>
+            <h2 className="text-3xl font-outfit font-black mb-2 italic">You're In!</h2>
+            <p className="text-white/40 text-xs mb-8 font-bold uppercase tracking-widest">
+              Waiting for host <strong className="text-white">{session.hostName || "Host"}</strong> to start
             </p>
 
             {others.length > 0 && (
-              <div className="text-left mb-6 bg-white/5 p-3 rounded-xl border border-white/5">
-                <p className="text-[10px] font-black uppercase text-white/40 mb-2">Participants ({others.length})</p>
-                <div className="space-y-1.5">
+              <div className="text-left mb-8 bg-white/5 p-4 rounded-2xl border border-white/5">
+                <p className="text-[10px] font-black uppercase tracking-[0.2em] text-white/40 mb-3 text-center">Others in Lobby ({others.length})</p>
+                <div className="flex flex-wrap justify-center gap-2">
                   {others.map((p) => (
-                    <div key={p.id} className="flex items-center gap-2 text-sm font-medium">
-                      <div className="w-1.5 h-1.5 rounded-full bg-green-400" />
+                    <div key={p.id} className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-white/5 border border-white/5 text-xs font-bold shadow-sm">
+                      <div className="w-1.5 h-1.5 rounded-full bg-green-400 shadow-[0_0_8px_rgba(74,222,128,0.8)]" />
                       {p.name}
                     </div>
                   ))}
@@ -104,11 +125,14 @@ function Lobby({ session, userName, socket }: {
               </div>
             )}
 
-            <div className="flex items-center justify-center gap-2">
-              <div className="px-3 py-1 bg-green-500/10 border border-green-500/20 rounded-full text-[10px] text-green-400 font-bold uppercase">Connected</div>
-              <div className="px-3 py-1 bg-white/5 border border-white/10 rounded-full text-[10px] text-white/40 font-bold uppercase tracking-tighter">ID: {session.id}</div>
+            <div className="flex justify-center mt-6">
+              <div className="flex items-center gap-2 bg-black/50 px-4 py-2 rounded-full border border-white/10">
+                <div className="w-2 h-2 rounded-full bg-green-500 animate-pulse" />
+                <span className="text-[10px] font-black text-white/60 uppercase tracking-widest">Live Connection</span>
+              </div>
             </div>
           </CardContent>
+          <div className="absolute inset-0 bg-gradient-to-b from-transparent to-black/20 pointer-events-none" />
         </Card>
       </div>
       
@@ -136,6 +160,12 @@ function ActivityView({ session, userName, socket }: {
     if (mode === "study") return <GroupStudyParticipant session={session} socket={socket} userName={userName} />;
     if (mode === "uno") return <UnoParticipant session={session} socket={socket} userName={userName} />;
     if (mode === "ludo") return <LudoParticipant session={session} socket={socket} userName={userName} />;
+    
+    // DECIDE section
+    if (mode === "thoughtmap") return <ThoughtMapParticipant session={session} socket={socket} userName={userName} />;
+    if (mode === "courtroom") return <CourtroomParticipant session={session} socket={socket} userName={userName} />;
+    if (mode === "duel") return <DuelDebateParticipant session={session} socket={socket} userName={userName} />;
+    if (mode === "decision") return <DecisionEngineParticipant session={session} socket={socket} userName={userName} />;
 
     return (
       <div className="w-full max-w-2xl text-center p-8 bg-[#121826] rounded-3xl border border-white/10 relative z-20">
@@ -149,9 +179,22 @@ function ActivityView({ session, userName, socket }: {
     <div className="min-h-[100dvh] bg-[#020617] flex flex-col relative text-white isolate overflow-hidden">
       <div className="fixed inset-0 pointer-events-none -z-10 bg-[#020617]" />
       
-      <div className="absolute top-4 right-4 bg-white/5 border border-white/10 px-4 py-2 rounded-full text-[10px] z-40 font-black text-primary uppercase tracking-widest backdrop-blur-md">
-        SESSION: {session.id}
-      </div>
+      <header className="h-16 md:h-14 border-b border-white/5 flex items-center justify-between px-4 shrink-0 bg-[#0A0D14]/80 backdrop-blur-md z-40">
+        <div className="flex items-center gap-2">
+          <div className="relative w-28 h-8 md:w-40 md:h-12">
+            <Image 
+              src="/logo.png" 
+              alt="CoAct Logo" 
+              fill
+              className="object-contain mix-blend-screen"
+              priority
+            />
+          </div>
+        </div>
+        <div className="text-[10px] font-black text-white/40 uppercase tracking-widest bg-white/5 px-3 py-1 rounded-full border border-white/5">
+          {session.mode}
+        </div>
+      </header>
 
       <div className={`flex-1 w-full flex items-center justify-center relative z-10 ${session.mode === 'board' ? '' : 'pt-16 pb-20 px-4'}`}>
         {renderActivity()}
@@ -242,3 +285,5 @@ export default function ParticipantSession() {
     </Suspense>
   );
 }
+
+

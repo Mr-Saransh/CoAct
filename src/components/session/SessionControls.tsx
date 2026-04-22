@@ -85,49 +85,63 @@ export function SessionControls({
       <motion.div 
         drag
         dragMomentum={false}
-        whileDrag={{ scale: 1.05, cursor: "grabbing" }}
-        className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 flex items-center gap-2 bg-black/80 backdrop-blur-xl border border-white/10 px-4 py-3 rounded-full shadow-2xl cursor-grab touch-none"
+        dragElastic={0}
+        whileDrag={{ scale: 1.02, cursor: "grabbing" }}
+        className="fixed bottom-4 md:bottom-10 left-1/2 -translate-x-1/2 z-[100] flex items-center gap-1.5 md:gap-2 bg-white/10 backdrop-blur-[24px] border border-white/20 px-3 py-3 md:px-5 md:py-4 rounded-full shadow-[0_20px_50px_rgba(0,0,0,0.4)] cursor-grab touch-none select-none pointer-events-auto"
       >
-        <Button variant="ghost" size="icon" onClick={onBack} title="Go Back" className="text-white hover:bg-white/10 rounded-full w-10 h-10">
-          <ArrowLeft className="w-5 h-5" />
-        </Button>
-        <div className="w-px h-6 bg-white/20 mx-1" />
-        
-        <Button 
-          variant={voiceActive ? "default" : "ghost"} 
-          size="icon" 
-          onClick={toggleVoice} 
-          title={isMutedByHost ? "Muted by Host" : "Toggle Voice"}
-          className={`rounded-full w-10 h-10 ${voiceActive ? "bg-green-500 hover:bg-green-600 text-white" : "text-white hover:bg-white/10"} ${isMutedByHost ? "opacity-50 cursor-not-allowed text-red-400" : ""}`}
-        >
-          {voiceActive ? <Mic className="w-5 h-5" /> : <MicOff className="w-5 h-5" />}
-        </Button>
-
-        <Button 
-          variant={activePanel === "chat" ? "default" : "ghost"} 
-          size="icon" 
-          onClick={() => togglePanel("chat")} 
-          title="Community Chat"
-          className={`rounded-full w-10 h-10 ${activePanel === "chat" ? "bg-primary hover:bg-primary/90 text-white" : "text-white hover:bg-white/10"}`}
-        >
-          <MessageSquare className="w-5 h-5" />
-        </Button>
-
-        {isHost && (
+        <div className="relative group">
+          <div className="absolute inset-0 bg-primary/20 rounded-full blur-md opacity-0 group-hover:opacity-100 transition-opacity" />
           <Button 
-            variant={activePanel === "mod" ? "default" : "ghost"} 
+            variant="ghost" 
             size="icon" 
-            onClick={() => togglePanel("mod")} 
-            title="Moderation Controls"
-            className={`rounded-full w-10 h-10 ${activePanel === "mod" ? "bg-violet-500 hover:bg-violet-600 text-white" : "text-white hover:bg-white/10"}`}
+            onClick={onBack} 
+            title="Go Back" 
+            className="text-white hover:bg-white/10 rounded-full w-10 h-10 md:w-12 md:h-12 relative border-2 border-primary shadow-[0_0_15px_rgba(0,212,255,0.3)]"
           >
-            <Shield className="w-5 h-5" />
+            <ArrowLeft className="w-5 h-5 md:w-6 md:h-6" />
           </Button>
-        )}
+        </div>
 
-        <div className="w-px h-6 bg-white/20 mx-1" />
-        <Button variant="ghost" size="icon" onClick={onLeave} title="Leave Session" className="text-red-400 hover:text-red-300 hover:bg-red-400/10 rounded-full w-10 h-10">
-          <LogOut className="w-5 h-5" />
+        <div className="w-px h-6 md:h-8 bg-white/10 mx-1 md:mx-2" />
+        
+        <div className="flex items-center gap-1">
+          <Button 
+            variant={voiceActive ? "default" : "ghost"} 
+            size="icon" 
+            onClick={toggleVoice} 
+            title={isMutedByHost ? "Muted by Host" : "Toggle Voice"}
+            className={`rounded-full w-10 h-10 md:w-12 md:h-12 ${voiceActive ? "bg-green-500 hover:bg-green-600 text-white shadow-[0_0_20px_rgba(34,197,94,0.3)]" : "text-white/60 hover:text-white hover:bg-white/10"} ${isMutedByHost ? "opacity-50 cursor-not-allowed text-red-400" : ""}`}
+          >
+            {voiceActive ? <Mic className="w-4 h-4 md:w-5 md:h-5" /> : <MicOff className="w-4 h-4 md:w-5 md:h-5" />}
+          </Button>
+
+          <Button 
+            variant={activePanel === "chat" ? "default" : "ghost"} 
+            size="icon" 
+            onClick={() => togglePanel("chat")} 
+            title="Community Chat"
+            className={`rounded-full w-10 h-10 md:w-12 md:h-12 ${activePanel === "chat" ? "bg-primary hover:bg-primary/90 text-white shadow-[0_0_20px_rgba(0,212,255,0.3)]" : "text-white/60 hover:text-white hover:bg-white/10"}`}
+          >
+            <MessageSquare className="w-4 h-4 md:w-5 md:h-5" />
+          </Button>
+
+          {isHost && (
+            <Button 
+              variant={activePanel === "mod" ? "default" : "ghost"} 
+              size="icon" 
+              onClick={() => togglePanel("mod")} 
+              title="Moderation Controls"
+              className={`rounded-full w-10 h-10 md:w-12 md:h-12 ${activePanel === "mod" ? "bg-violet-500 hover:bg-violet-600 text-white shadow-[0_0_20px_rgba(139,92,246,0.3)]" : "text-white/60 hover:text-white hover:bg-white/10"}`}
+            >
+              <Shield className="w-4 h-4 md:w-5 md:h-5" />
+            </Button>
+          )}
+        </div>
+
+        <div className="w-px h-6 md:h-8 bg-white/10 mx-1 md:mx-2" />
+        
+        <Button variant="ghost" size="icon" onClick={onLeave} title="Leave Session" className="text-red-400/60 hover:text-red-400 hover:bg-red-400/10 rounded-full w-10 h-10 md:w-12 md:h-12">
+          <LogOut className="w-5 h-5 md:w-6 md:h-6" />
         </Button>
       </motion.div>
 
