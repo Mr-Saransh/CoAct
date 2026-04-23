@@ -16,6 +16,9 @@ const outfit = Outfit({
 export const metadata: Metadata = {
   title: "CoAct | Real-Time Group Interaction",
   description: "A premium, browser-based real-time group interaction platform.",
+  icons: {
+    icon: "/logo.png",
+  },
 };
 
 export default function RootLayout({
