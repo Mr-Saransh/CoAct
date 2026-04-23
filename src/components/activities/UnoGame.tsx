@@ -4,7 +4,7 @@ import React, { useEffect, useMemo, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Ban, RefreshCcw, Sparkles } from "lucide-react";
+import { Ban, RefreshCcw, Sparkles, User } from "lucide-react";
 
 type UnoCard = {
   id: string;
@@ -73,8 +73,9 @@ function canPlayCard(card: UnoCard, currentCard: UnoCard | null, currentColor: s
 
 function getSeatPosition(index: number, total: number, isMobile: boolean) {
   const angle = (index / total) * Math.PI * 2;
-  const radiusX = isMobile ? 36 : 42;
-  const radiusY = isMobile ? 32 : 38;
+  // Reduced radius even more to prevent overlap and cut-offs
+  const radiusX = isMobile ? 32 : 38;
+  const radiusY = isMobile ? 28 : 34;
   return {
     x: Math.cos(angle - Math.PI / 2) * radiusX,
     y: Math.sin(angle - Math.PI / 2) * radiusY
@@ -307,7 +308,13 @@ function UnoBoard({ session, socket, userName }: { session: SessionLike; socket:
             <span className={`text-sm font-black ${secondsLeft < 10 ? "text-red-400 animate-pulse" : "text-white"}`}>{secondsLeft}s</span>
           </div>
         </div>
-        <div className={`w-10 h-10 rounded-full shadow-lg border-2 border-white/20 ${currentColorMeta.bg.split(' ')[1]}`} />
+        <div className="flex items-center gap-3">
+            <div className="flex flex-col items-end">
+                <span className="text-[10px] font-black text-white/30 uppercase tracking-widest">Active Color</span>
+                <span className="text-[10px] font-black text-white uppercase">{state.currentColor || "WAITING"}</span>
+            </div>
+            <div className={`w-10 h-10 rounded-full shadow-lg border-2 border-white/20 transition-colors duration-500 ${currentColorMeta.bg.split(' ')[1]}`} />
+        </div>
       </div>
 
       {/* Main Arena Area */}
@@ -362,12 +369,12 @@ function UnoBoard({ session, socket, userName }: { session: SessionLike; socket:
               animate={isTurn ? { scale: 1.1 } : { scale: 1 }}
             >
               <div className={`relative flex flex-col items-center gap-2 p-3 rounded-2xl backdrop-blur-2xl border transition-all min-w-[100px] ${isTurn ? "bg-primary/10 border-primary shadow-xl" : "bg-black/40 border-white/10"}`}>
-                <div className={`w-10 h-10 rounded-xl flex items-center justify-center text-white font-black text-lg ${isTurn ? "bg-primary text-black" : "bg-white/10"}`}>
+                <div className={`w-8 h-8 md:w-10 rounded-xl flex items-center justify-center text-white font-black text-lg ${isTurn ? "bg-primary text-black" : "bg-white/10"}`}>
                   {name[0].toUpperCase()}
                 </div>
                 <div className="text-center w-full px-2">
                   <p className="text-[10px] font-black text-white truncate w-full uppercase tracking-tight">{name}</p>
-                  <p className={`text-[8px] font-bold ${isTurn ? "text-primary" : "text-white/30"}`}>{cardsCount} CARDS</p>
+                  <p className={`text-[8px] font-bold ${isTurn ? "text-primary" : "text-white/20"}`}>{cardsCount} CARDS</p>
                 </div>
               </div>
             </motion.div>
@@ -411,6 +418,47 @@ function UnoBoard({ session, socket, userName }: { session: SessionLike; socket:
           </div>
         </div>
       </div>
+
+      {/* Wild Card Color Selection Overlay */}
+      <AnimatePresence>
+        {selectedWildCardId && (
+          <div className="fixed inset-0 bg-black/80 backdrop-blur-xl z-[300] flex items-center justify-center p-6">
+            <motion.div
+              initial={{ scale: 0.9, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.9, opacity: 0 }}
+              className="bg-[#0A0D14] border border-white/10 rounded-[3rem] p-10 max-w-sm w-full text-center shadow-3xl"
+            >
+              <h3 className="text-3xl font-black text-white mb-2 italic uppercase">Choose Color</h3>
+              <p className="text-[10px] font-black text-white/40 uppercase tracking-[0.3em] mb-10">Define your strategy</p>
+              
+              <div className="grid grid-cols-2 gap-4">
+                {(["red", "blue", "green", "yellow"] as const).map((color) => (
+                  <button
+                    key={color}
+                    onClick={() => {
+                      const card = myCards.find(c => c.id === selectedWildCardId);
+                      if (card) playCard(card, color);
+                      setSelectedWildCardId(null);
+                    }}
+                    className={`h-24 rounded-3xl bg-gradient-to-br shadow-xl hover:scale-105 transition-transform border border-white/10 flex items-center justify-center ${COLOR_META[color].bg}`}
+                  >
+                    <Sparkles className={`w-8 h-8 ${color === 'yellow' ? 'text-black/40' : 'text-white/40'}`} />
+                  </button>
+                ))}
+              </div>
+              
+              <Button 
+                variant="ghost" 
+                onClick={() => setSelectedWildCardId(null)}
+                className="mt-8 text-white/40 font-black uppercase text-[10px] tracking-widest hover:text-white"
+              >
+                Cancel Action
+              </Button>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
 
       <AnimatePresence>
         {state.winner && (

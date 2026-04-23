@@ -548,7 +548,7 @@ function LudoBoard({ session, socket, userName }: { session: SessionLike; socket
   };
 
   return (
-    <div className="w-full max-w-5xl mx-auto px-4 py-8 pb-40 flex flex-col items-center relative animate-in fade-in duration-700 font-outfit">
+    <div className="w-full max-w-5xl mx-auto px-4 py-4 pb-32 flex flex-col items-center relative animate-in fade-in duration-700 font-outfit">
       <FloatingReactions sessionId={session.id} socket={socket} />
       
       {isSpectator && (
@@ -599,7 +599,7 @@ function LudoBoard({ session, socket, userName }: { session: SessionLike; socket
         })}
       </div>
 
-      <div className="relative w-full max-w-[min(94vw,640px)] aspect-square bg-slate-900 rounded-3xl p-[1%] shadow-[0_0_100px_rgba(0,0,0,0.5)] border-[8px] border-[#1E293B] overflow-hidden ring-[12px] ring-black/10">
+      <div className="relative w-full max-w-[min(94vw,70vh,640px)] aspect-square bg-slate-900 rounded-3xl p-[1%] shadow-3xl border-[8px] border-[#1E293B] overflow-hidden ring-[12px] ring-black/10">
         <div className="absolute inset-0 grid grid-cols-15 grid-rows-15">
           {Array.from({ length: 15 }).map((_, r) => 
             Array.from({ length: 15 }).map((_, c) => (
@@ -630,7 +630,7 @@ function LudoBoard({ session, socket, userName }: { session: SessionLike; socket
         ))}
       </div>
 
-      <div className="mt-12 mb-24 flex flex-col items-center gap-8">
+      <div className="mt-8 mb-12 flex flex-col items-center gap-6">
         <div className="flex flex-col items-center gap-4">
           <div className="px-4 py-1.5 rounded-full bg-white/5 border border-white/10 backdrop-blur-md">
             <p className="text-[10px] font-black uppercase tracking-[0.4em] text-white/60">
