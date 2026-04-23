@@ -62,7 +62,14 @@ export default function Home() {
       {/* Navigation */}
       <header className="sticky top-0 z-[100] h-20 bg-[#020617]/80 backdrop-blur-md border-b border-white/5 px-6 md:px-12 flex items-center justify-between">
         <div className="relative w-32 h-8">
-          <Image src="/logo.png" alt="CoAct Logo" fill className="object-contain mix-blend-screen" priority />
+          <Image 
+            src="/logo.png" 
+            alt="CoAct Logo" 
+            fill 
+            sizes="(max-width: 768px) 128px, 160px"
+            className="object-contain mix-blend-screen" 
+            priority 
+          />
         </div>
         <div className="hidden md:flex items-center gap-8 text-[10px] font-black uppercase tracking-[0.25em] text-white/40">
           <a href="#about" className="hover:text-white transition-colors">About</a>
@@ -187,7 +194,13 @@ export default function Home() {
             </ul>
           </div>
           <div className="relative aspect-square rounded-[3rem] overflow-hidden border border-white/10 shadow-3xl bg-[#0A0D14]">
-            <Image src="/activities_banner.png" alt="Collaborative Tools" fill className="object-cover opacity-60" />
+            <Image 
+              src="/activities_banner.png" 
+              alt="Collaborative Tools" 
+              fill 
+              sizes="(max-width: 768px) 100vw, 50vw"
+              className="object-cover opacity-60" 
+            />
             <div className="absolute inset-0 bg-gradient-to-t from-[#020617] via-transparent to-transparent" />
           </div>
         </div>
@@ -246,7 +259,13 @@ export default function Home() {
       {/* Footer */}
       <footer className="py-20 border-t border-white/5 text-center">
         <div className="relative w-32 h-8 mx-auto opacity-30 mb-10">
-          <Image src="/logo.png" alt="CoAct Logo" fill className="object-contain mix-blend-screen grayscale" />
+          <Image 
+            src="/logo.png" 
+            alt="CoAct Logo" 
+            fill 
+            sizes="128px"
+            className="object-contain mix-blend-screen grayscale" 
+          />
         </div>
         <div className="flex items-center justify-center gap-10 text-[10px] font-black uppercase tracking-[0.4em] text-white/20 mb-10">
           <span>Real-Time Engine</span>

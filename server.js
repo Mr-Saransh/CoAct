@@ -4,7 +4,7 @@ const { Server } = require('socket.io')
 
 const port = parseInt(process.env.PORT || '3000', 10)
 const dev = process.env.NODE_ENV !== 'production'
-const hostname = dev ? 'localhost' : '0.0.0.0'
+const hostname = '0.0.0.0'
 const server = createServer()
 const path = require('path')
 const app = next({ dev, dir: __dirname, hostname, port, webpack: true })
@@ -1400,6 +1400,6 @@ app.prepare().then(() => {
 
   server.listen(port, hostname, (err) => {
     if (err) throw err
-    console.log(`> Ready on http://${hostname}:${port}`)
+    console.log(`> Ready on http://localhost:${port} (bound to ${hostname})`)
   })
 })

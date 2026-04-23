@@ -101,7 +101,7 @@ export function SessionControls({
         dragMomentum={false}
         dragElastic={0}
         whileDrag={{ scale: 1.02, cursor: "grabbing" }}
-        className="fixed bottom-6 md:bottom-12 left-1/2 -translate-x-1/2 z-[100] flex items-center gap-2 md:gap-3 bg-white/[0.08] backdrop-blur-[32px] border border-white/10 px-4 py-3 md:px-6 md:py-4 rounded-[2.5rem] shadow-[0_32px_64px_-12px_rgba(0,0,0,0.6)] cursor-grab touch-none select-none pointer-events-auto ring-1 ring-white/10"
+        className="fixed bottom-4 md:bottom-12 left-1/2 -translate-x-1/2 z-[100] flex items-center gap-1.5 md:gap-3 bg-white/[0.08] backdrop-blur-[32px] border border-white/10 px-3 py-2 md:px-6 md:py-4 rounded-[2rem] md:rounded-[2.5rem] shadow-[0_32px_64px_-12px_rgba(0,0,0,0.6)] cursor-grab touch-none select-none pointer-events-auto ring-1 ring-white/10"
       >
         <div className="relative group">
           <div className="absolute inset-0 bg-primary/20 rounded-full blur-xl opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
@@ -110,23 +110,23 @@ export function SessionControls({
             size="icon" 
             onClick={onBack} 
             title="Go Back" 
-            className="text-white hover:bg-white/10 rounded-full w-10 h-10 md:w-14 md:h-14 relative border border-primary/40 shadow-[0_0_20px_rgba(0,212,255,0.2)] hover:border-primary transition-all duration-300"
+            className="text-white hover:bg-white/10 rounded-full w-9 h-9 md:w-14 md:h-14 relative border border-primary/40 shadow-[0_0_20px_rgba(0,212,255,0.2)] hover:border-primary transition-all duration-300"
           >
-            <ArrowLeft className="w-5 h-5 md:w-6 md:h-6" />
+            <ArrowLeft className="w-4 h-4 md:w-6 md:h-6" />
           </Button>
         </div>
 
         <div className="w-px h-8 md:h-10 bg-white/10 mx-1 md:mx-2" />
         
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-1 md:gap-2">
           <Button 
             variant={voiceActive ? "default" : "ghost"} 
             size="icon" 
             onClick={toggleVoice} 
             title={isMutedByHost ? "Muted by Host" : "Toggle Voice"}
-            className={`rounded-full w-10 h-10 md:w-14 md:h-14 transition-all duration-300 border border-transparent ${voiceActive ? "bg-green-500/20 border-green-500/50 text-green-400 shadow-[0_0_30px_rgba(34,197,94,0.2)] hover:bg-green-500/30" : "text-white/40 hover:text-white hover:bg-white/10"} ${isMutedByHost ? "opacity-50 cursor-not-allowed text-red-400" : ""}`}
+            className={`rounded-full w-9 h-9 md:w-14 md:h-14 transition-all duration-300 border border-transparent ${voiceActive ? "bg-green-500/20 border-green-500/50 text-green-400 shadow-[0_0_30px_rgba(34,197,94,0.2)] hover:bg-green-500/30" : "text-white/40 hover:text-white hover:bg-white/10"} ${isMutedByHost ? "opacity-50 cursor-not-allowed text-red-400" : ""}`}
           >
-            {voiceActive ? <Mic className="w-5 h-5 md:w-6 md:h-6" /> : <MicOff className="w-5 h-5 md:w-6 md:h-6" />}
+            {voiceActive ? <Mic className="w-4 h-4 md:w-6 md:h-6" /> : <MicOff className="w-4 h-4 md:w-6 md:h-6" />}
           </Button>
 
           <Button 
@@ -134,9 +134,9 @@ export function SessionControls({
             size="icon" 
             onClick={() => togglePanel("chat")} 
             title="Community Chat"
-            className={`rounded-full w-10 h-10 md:w-14 md:h-14 transition-all duration-300 border border-transparent ${activePanel === "chat" ? "bg-primary/20 border-primary/50 text-primary shadow-[0_0_30px_rgba(0,212,255,0.2)] hover:bg-primary/30" : "text-white/40 hover:text-white hover:bg-white/10"}`}
+            className={`rounded-full w-9 h-9 md:w-14 md:h-14 transition-all duration-300 border border-transparent ${activePanel === "chat" ? "bg-primary/20 border-primary/50 text-primary shadow-[0_0_30px_rgba(0,212,255,0.2)] hover:bg-primary/30" : "text-white/40 hover:text-white hover:bg-white/10"}`}
           >
-            <MessageSquare className="w-5 h-5 md:w-6 md:h-6" />
+            <MessageSquare className="w-4 h-4 md:w-6 md:h-6" />
           </Button>
 
           {isHost && (
@@ -145,9 +145,9 @@ export function SessionControls({
               size="icon" 
               onClick={() => togglePanel("mod")} 
               title="Moderation Controls"
-              className={`rounded-full w-10 h-10 md:w-14 md:h-14 transition-all duration-300 border border-transparent ${activePanel === "mod" ? "bg-violet-500/20 border-violet-500/50 text-violet-400 shadow-[0_0_30px_rgba(139,92,246,0.2)] hover:bg-violet-500/30" : "text-white/40 hover:text-white hover:bg-white/10"}`}
+              className={`rounded-full w-9 h-9 md:w-14 md:h-14 transition-all duration-300 border border-transparent ${activePanel === "mod" ? "bg-violet-500/20 border-violet-500/50 text-violet-400 shadow-[0_0_30px_rgba(139,92,246,0.2)] hover:bg-violet-500/30" : "text-white/40 hover:text-white hover:bg-white/10"}`}
             >
-              <Shield className="w-5 h-5 md:w-6 md:h-6" />
+              <Shield className="w-4 h-4 md:w-6 md:h-6" />
             </Button>
           )}
         </div>
@@ -159,9 +159,9 @@ export function SessionControls({
           size="icon" 
           onClick={onLeave} 
           title="Exit Session"
-          className="rounded-full w-10 h-10 md:w-14 md:h-14 text-white/40 hover:text-red-400 hover:bg-red-500/10 transition-all duration-300 border border-transparent hover:border-red-500/30"
+          className="rounded-full w-9 h-9 md:w-14 md:h-14 text-white/40 hover:text-red-400 hover:bg-red-500/10 transition-all duration-300 border border-transparent hover:border-red-500/30"
         >
-          <LogOut className="w-5 h-5 md:w-6 md:h-6" />
+          <LogOut className="w-4 h-4 md:w-6 md:h-6" />
         </Button>
       </motion.div>
 

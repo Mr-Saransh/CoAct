@@ -181,6 +181,7 @@ function SharedCanvas({
       const newDist = Math.hypot(pts[0].x - pts[1].x, pts[0].y - pts[1].y);
       const ratio = newDist / pinchRef.current.dist;
       setScale(Math.max(0.2, Math.min(3, pinchRef.current.scale * ratio)));
+      return;
     }
 
     const dx = e.clientX - lastPointerRef.current.x;
@@ -190,21 +191,18 @@ function SharedCanvas({
     if (dragNodeId) {
       const node = nodes.find((n) => n.id === dragNodeId);
       if (node) {
-        const nextX = node.x + dx / scale;
-        const nextY = node.y + dy / scale;
-        
-        // Optimistically update the object property (mutating here for performance since it's about to be replaced by state broadcast anyway)
-        node.x = nextX;
-        node.y = nextY;
+        // High-performance mutation for local feel
+        node.x += dx / scale;
+        node.y += dy / scale;
 
-        // Throttle emits to every ~50ms
+        // Throttled sync with server (only sync every 100ms to reduce traffic)
         const now = Date.now();
-        if (now - (lastTapRef.current.time || 0) > 50) {
+        if (now - (lastTapRef.current.time || 0) > 100) {
           socket.emit("thoughtmap:move_node", {
             sessionId,
             nodeId: dragNodeId,
-            x: nextX,
-            y: nextY,
+            x: node.x,
+            y: node.y,
           });
           lastTapRef.current.time = now;
         }

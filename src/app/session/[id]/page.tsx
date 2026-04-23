@@ -195,7 +195,7 @@ function ActivityView({ session, userName, socket }: {
   };
 
   return (
-    <div className="min-h-[100dvh] bg-[#020617] flex flex-col relative text-white isolate overflow-hidden">
+    <div className="h-[100dvh] bg-[#020617] flex flex-col relative text-white isolate overflow-hidden">
       <div className="fixed inset-0 pointer-events-none -z-10 bg-[#020617]" />
       
       <header className="h-16 md:h-14 border-b border-white/5 flex items-center justify-between px-4 shrink-0 bg-[#0A0D14]/80 backdrop-blur-md z-40">
@@ -216,20 +216,22 @@ function ActivityView({ session, userName, socket }: {
         </div>
       </header>
 
-      <div className={`flex-1 w-full flex items-center justify-center relative z-10 ${session.mode === 'board' ? '' : 'pt-16 pb-20 px-4'}`}>
+      <main className="flex-1 w-full relative z-10 min-h-0 flex flex-col overflow-hidden">
         <AnimatePresence mode="wait">
           <motion.div
             key={session.mode}
-            initial={{ opacity: 0, scale: 0.98, filter: "blur(10px)" }}
-            animate={{ opacity: 1, scale: 1, filter: "blur(0px)" }}
-            exit={{ opacity: 0, scale: 1.02, filter: "blur(10px)" }}
-            transition={{ duration: 0.4, ease: [0.16, 1, 0.3, 1] }}
-            className="w-full h-full flex items-center justify-center"
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -10 }}
+            transition={{ duration: 0.3 }}
+            className={`w-full h-full flex flex-col items-center justify-center ${
+              session.mode === 'board' || session.mode === 'thoughtmap' ? '' : 'p-4 md:p-8'
+            }`}
           >
             {renderActivity()}
           </motion.div>
         </AnimatePresence>
-      </div>
+      </main>
 
       <SessionControls session={session} socket={socket} userName={userName} isHost={false} onLeave={() => window.location.href = "/"} onBack={() => {}} />
     </div>

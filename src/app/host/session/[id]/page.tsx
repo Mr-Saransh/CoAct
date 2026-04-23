@@ -173,7 +173,7 @@ function HostSessionContent() {
   }
 
   return (
-    <div className="flex flex-col min-h-screen bg-[#050505] text-white overflow-hidden isolate font-sans">
+    <div className="flex flex-col h-[100dvh] bg-[#050505] text-white overflow-hidden isolate font-sans">
       {session && socket && (
         <SessionControls 
           session={session} 
@@ -197,6 +197,7 @@ function HostSessionContent() {
               src="/logo.png" 
               alt="CoAct Logo" 
               fill
+              sizes="(max-width: 768px) 144px, 160px"
               className="object-contain"
               priority
             />
@@ -358,9 +359,9 @@ function HostSessionContent() {
         </AnimatePresence>
 
         {/* Main Content Area */}
-        <main className="flex-1 overflow-y-auto p-8 relative flex flex-col">
+        <main className={`flex-1 relative flex flex-col min-h-0 ${isLive ? "" : "overflow-y-auto"}`}>
           {isLive && socket ? (
-            <div className="w-full h-full min-h-[70vh] flex-1">
+            <div className="w-full h-full flex-1 relative overflow-hidden">
               {currentMode === "board" ? <ThinkingBoard socket={socket} sessionId={sessionId} userName={hostName} session={session} isHost={true} /> :
               currentMode === "poll" ? <LivePollHost session={session} updateActivity={updateActivity} /> :
               currentMode === "quiz" || currentMode === "trivia" ? <QuizHost session={session} updateActivity={updateActivity} /> :
