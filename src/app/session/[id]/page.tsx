@@ -150,7 +150,7 @@ function Lobby({ session, userName, socket }: {
                   </div>
                 </div>
               </div>
-            </CardContent>
+            </div>
           </Card>
         </motion.div>
       </div>
