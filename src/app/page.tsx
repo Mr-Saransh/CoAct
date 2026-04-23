@@ -58,7 +58,7 @@ export default function Home() {
   const isHostReady = hostName.trim().length > 0;
 
   return (
-    <div className="min-h-screen bg-[#020617] text-white selection:bg-primary/20 selection:text-primary">
+    <div className="min-h-screen bg-[#020617] text-white selection:bg-primary/20 selection:text-primary overflow-x-hidden">
       {/* Navigation */}
       <header className="sticky top-0 z-[100] h-20 bg-[#020617]/80 backdrop-blur-md border-b border-white/5 px-6 md:px-12 flex items-center justify-between">
         <div className="relative w-32 h-8">

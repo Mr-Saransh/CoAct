@@ -115,7 +115,7 @@
     @apply border-border outline-ring/50;
   }
   body {
-    @apply bg-background text-foreground antialiased selection:bg-primary/30 selection:text-primary;
+    @apply bg-background text-foreground antialiased selection:bg-primary/30 selection:text-primary overflow-x-hidden;
     background-image: 
       radial-gradient(circle at 15% 50%, rgba(79, 70, 229, 0.08), transparent 25%),
       radial-gradient(circle at 85% 30%, rgba(0, 212, 255, 0.08), transparent 25%),
@@ -124,9 +124,9 @@
     min-height: 100dvh;
   }
   html {
-    @apply font-sans;
+    @apply font-sans overflow-x-hidden;
     color-scheme: dark;
-    scrollbar-gutter: stable;
+    scrollbar-gutter: auto;
   }
 
   /* Premium Scrollbar */
