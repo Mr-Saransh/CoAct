@@ -197,7 +197,7 @@ function HostSessionContent() {
               src="/logo.png" 
               alt="CoAct Logo" 
               fill
-              className="object-contain mix-blend-screen"
+              className="object-contain"
               priority
             />
           </div>

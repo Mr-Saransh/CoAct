@@ -75,7 +75,7 @@ export default function Home() {
               src="/logo.png" 
               alt="CoAct Logo" 
               fill
-              className="object-contain mix-blend-screen scale-125 transition-transform duration-700 hover:scale-130"
+              className="object-contain scale-125 transition-transform duration-700 hover:scale-130"
               priority
             />
           </div>

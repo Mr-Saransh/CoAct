@@ -206,7 +206,7 @@ function ActivityView({ session, userName, socket }: {
               alt="CoAct Logo" 
               fill
               sizes="(max-width: 768px) 112px, 160px"
-              className="object-contain mix-blend-screen"
+              className="object-contain"
               priority
             />
           </div>
