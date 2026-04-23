@@ -1400,6 +1400,6 @@ app.prepare().then(() => {
 
   server.listen(port, hostname, (err) => {
     if (err) throw err
-    console.log(`> Ready on http://localhost:${port} (bound to ${hostname})`)
+    console.log(`> Ready on http://${hostname}:${port}`)
   })
 })
