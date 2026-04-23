@@ -1398,9 +1398,8 @@ app.prepare().then(() => {
     })
   })
 
-  const host = 'localhost'
-  server.listen(port, host, (err) => {
+  server.listen(port, hostname, (err) => {
     if (err) throw err
-    console.log(`> Ready on http://${host}:${port}`)
+    console.log(`> Ready on http://${hostname}:${port}`)
   })
 })
