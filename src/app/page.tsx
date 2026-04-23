@@ -8,7 +8,7 @@ import { motion } from "framer-motion";
 import { 
   Users, QrCode, ArrowRight, Zap, Plus, 
   GraduationCap, BookOpen, Gamepad2, BrainCircuit,
-  ShieldCheck, Globe, Cpu, ChevronDown
+  ShieldCheck, Globe, Cpu, CheckCircle2, MessageCircle
 } from "lucide-react";
 
 function generateCode() {
@@ -58,190 +58,204 @@ export default function Home() {
   const isHostReady = hostName.trim().length > 0;
 
   return (
-    <div className="min-h-screen bg-[#020617] text-white selection:bg-primary/30 selection:text-primary">
-      {/* Static Header for Performance */}
-      <header className="sticky top-0 inset-x-0 h-16 bg-[#020617]/80 backdrop-blur-md border-b border-white/5 z-[100] px-6 flex items-center justify-between">
-        <div className="relative w-28 h-7">
-          <Image src="/logo.png" alt="CoAct Logo" fill className="object-contain mix-blend-screen" />
+    <div className="min-h-screen bg-[#020617] text-white selection:bg-primary/20 selection:text-primary">
+      {/* Navigation */}
+      <header className="sticky top-0 z-[100] h-20 bg-[#020617]/80 backdrop-blur-md border-b border-white/5 px-6 md:px-12 flex items-center justify-between">
+        <div className="relative w-32 h-8">
+          <Image src="/logo.png" alt="CoAct Logo" fill className="object-contain mix-blend-screen" priority />
+        </div>
+        <div className="hidden md:flex items-center gap-8 text-[10px] font-black uppercase tracking-[0.25em] text-white/40">
+          <a href="#about" className="hover:text-white transition-colors">About</a>
+          <a href="#features" className="hover:text-white transition-colors">Features</a>
+          <a href="#security" className="hover:text-white transition-colors">Security</a>
         </div>
         <div className="flex items-center gap-4">
-          <button onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })} className="bg-primary text-black px-4 py-1.5 rounded-full text-[10px] font-black uppercase tracking-widest hover:opacity-90 transition-all">
+          <button onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })} className="bg-white text-black px-6 py-2 rounded-full text-[10px] font-black uppercase tracking-widest hover:bg-white/90 transition-colors">
             Get Started
           </button>
         </div>
       </header>
 
       {/* Hero Section */}
-      <section className="min-h-[90vh] flex flex-col items-center justify-center p-6 relative">
-        <div className="absolute inset-0 bg-[#020617]" />
-        <div className="absolute top-0 left-1/4 w-[400px] h-[400px] bg-primary/5 rounded-full blur-[120px] pointer-events-none opacity-50" />
-        <div className="absolute bottom-0 right-1/4 w-[400px] h-[400px] bg-violet-500/5 rounded-full blur-[120px] pointer-events-none opacity-50" />
+      <section className="relative pt-32 pb-20 px-6 overflow-hidden">
+        <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[800px] h-[400px] bg-primary/10 rounded-full blur-[120px] pointer-events-none" />
+        
+        <div className="max-w-[1200px] mx-auto text-center mb-24">
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.6 }}
+          >
+            <h1 className="text-5xl md:text-7xl lg:text-8xl font-outfit font-black tracking-tight mb-8 leading-[0.95]">
+              Seamless Group <br /> <span className="text-primary">Co-Action.</span>
+            </h1>
+            <p className="max-w-2xl mx-auto text-white/50 text-lg md:text-xl font-medium leading-relaxed mb-12">
+              The ultimate real-time engine for professional teams, students, and groups to collaborate, learn, and play in a unified digital space.
+            </p>
+          </motion.div>
 
-        <div className="w-full max-w-[1000px] z-10">
-          <div className="flex flex-col items-center text-center mb-16">
-            <motion.div 
-              initial={{ opacity: 0, y: 10 }}
-              animate={{ opacity: 1, y: 0 }}
-              className="relative w-64 h-16 md:w-80 md:h-20 mb-8"
-            >
-              <Image 
-                src="/logo.png" 
-                alt="CoAct Logo" 
-                fill
-                className="object-contain mix-blend-screen"
-                priority
-              />
-            </motion.div>
-            <motion.h1 
-              initial={{ opacity: 0, y: 10 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.1 }}
-              className="text-4xl md:text-6xl font-outfit font-black tracking-tight mb-6"
-            >
-              Real-Time Collaboration <br /> <span className="text-primary">Redefined.</span>
-            </motion.h1>
-          </div>
-
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 items-stretch">
-            {/* Join Session Card */}
-            <motion.div
-              initial={{ opacity: 0, x: -20 }}
-              animate={{ opacity: 1, x: 0 }}
-              transition={{ delay: 0.2 }}
-            >
-              <Card className="h-full border-white/5 bg-white/[0.02] backdrop-blur-xl rounded-[2rem] overflow-hidden group hover:border-primary/30 transition-all">
-                <CardContent className="p-8 md:p-10 flex flex-col h-full">
-                  <div className="mb-8">
-                    <h2 className="text-2xl font-black text-white mb-1">Join Session</h2>
-                    <p className="text-[10px] text-primary font-black uppercase tracking-[0.2em] opacity-60">Connect to an active room</p>
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 max-w-[1000px] mx-auto text-left">
+            {/* Join */}
+            <motion.div initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: 0.2 }}>
+              <Card className="border-white/5 bg-white/[0.01] backdrop-blur-xl rounded-[2.5rem] p-10 hover:border-primary/20 transition-all shadow-2xl">
+                <h2 className="text-2xl font-black mb-6">Join a Session</h2>
+                <form onSubmit={handleJoin} className="space-y-4">
+                  <Input
+                    placeholder="Enter your name"
+                    className="h-14 bg-white/5 border-white/10 rounded-2xl focus:ring-primary/20 focus:border-primary/50"
+                    value={joinName}
+                    onChange={(e) => setJoinName(e.target.value)}
+                    required
+                  />
+                  <div className="relative">
+                    <Input
+                      placeholder="Access Code"
+                      className="h-14 bg-white/5 border-white/10 rounded-2xl pl-12 uppercase font-mono tracking-widest text-primary focus:ring-primary/20 focus:border-primary/50"
+                      value={joinCode}
+                      onChange={(e) => setJoinCode(e.target.value.toUpperCase())}
+                      maxLength={6}
+                      required
+                    />
+                    <QrCode className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-white/20" />
                   </div>
-
-                  <form onSubmit={handleJoin} className="space-y-5 flex-1 flex flex-col">
-                    <div className="space-y-4">
-                      <Input
-                        placeholder="Your Identity (e.g. Alex)"
-                        className="bg-white/5 border-white/10 h-14 text-white placeholder:text-white/20 focus:border-primary/50 focus:ring-0 rounded-xl"
-                        value={joinName}
-                        onChange={(e) => setJoinName(e.target.value)}
-                        maxLength={20}
-                      />
-                      <div className="relative">
-                        <Input
-                          placeholder="ACCESS CODE"
-                          className="bg-white/5 border-white/10 h-14 uppercase font-mono tracking-widest text-primary pl-12 focus:border-primary/50 focus:ring-0 rounded-xl"
-                          value={joinCode}
-                          onChange={(e) => setJoinCode(e.target.value.toUpperCase())}
-                          maxLength={10}
-                        />
-                        <QrCode className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-white/30" />
-                      </div>
-                    </div>
-
-                    <button 
-                      type="submit" 
-                      disabled={!isJoinReady || isNavigating}
-                      className={`w-full h-14 mt-6 rounded-xl font-black uppercase tracking-widest text-xs transition-all flex items-center justify-center gap-2
-                        ${isJoinReady 
-                          ? "bg-primary text-black hover:scale-[1.02] active:scale-95 shadow-lg shadow-primary/10" 
-                          : "bg-white/5 text-white/20 cursor-not-allowed"
-                        }`}
-                    >
-                      {isNavigating ? "Synchronizing..." : "Join Collaboration"}
-                      <ArrowRight className="w-4 h-4" />
-                    </button>
-                  </form>
-                </CardContent>
+                  <button 
+                    disabled={!isJoinReady || isNavigating}
+                    className={`w-full h-14 rounded-2xl font-black uppercase tracking-widest text-xs transition-all flex items-center justify-center gap-3
+                      ${isJoinReady ? "bg-primary text-black hover:scale-[1.02] shadow-xl shadow-primary/20" : "bg-white/5 text-white/20 cursor-not-allowed"}`}
+                  >
+                    {isNavigating ? "Connecting..." : "Enter Workspace"}
+                    <ArrowRight className="w-4 h-4" />
+                  </button>
+                </form>
               </Card>
             </motion.div>
 
-            {/* Host Session Card */}
-            <motion.div
-              initial={{ opacity: 0, x: 20 }}
-              animate={{ opacity: 1, x: 0 }}
-              transition={{ delay: 0.3 }}
-            >
-              <Card className="h-full border-white/5 bg-white/[0.02] backdrop-blur-xl rounded-[2rem] overflow-hidden group hover:border-violet-500/30 transition-all">
-                <CardContent className="p-8 md:p-10 flex flex-col h-full">
-                  <div className="mb-8">
-                    <h2 className="text-2xl font-black text-white mb-1">Host Session</h2>
-                    <p className="text-[10px] text-violet-400 font-black uppercase tracking-[0.2em] opacity-60">Start a new collaboration</p>
+            {/* Host */}
+            <motion.div initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: 0.3 }}>
+              <Card className="border-white/5 bg-white/[0.01] backdrop-blur-xl rounded-[2.5rem] p-10 hover:border-violet-500/20 transition-all shadow-2xl">
+                <h2 className="text-2xl font-black mb-6">Create Session</h2>
+                <form onSubmit={handleCreate} className="space-y-4">
+                  <Input
+                    placeholder="Host display name"
+                    className="h-14 bg-white/5 border-white/10 rounded-2xl focus:ring-violet-500/20 focus:border-violet-500/50"
+                    value={hostName}
+                    onChange={(e) => setHostName(e.target.value)}
+                    required
+                  />
+                  <div className="p-6 rounded-2xl bg-white/5 border border-white/5 flex items-center gap-4">
+                    <Zap className="w-5 h-5 text-violet-400 shrink-0" />
+                    <p className="text-[11px] text-white/40 leading-relaxed font-medium">
+                      Start a new room and get an instant invite code for your participants.
+                    </p>
                   </div>
-
-                  <form onSubmit={handleCreate} className="space-y-5 flex-1 flex flex-col">
-                    <Input
-                      placeholder="Host Name (e.g. Sam)"
-                      className="bg-white/5 border-white/10 h-14 text-white placeholder:text-white/20 focus:border-violet-500/50 focus:ring-0 rounded-xl"
-                      value={hostName}
-                      onChange={(e) => setHostName(e.target.value)}
-                      maxLength={20}
-                    />
-                    <div className="p-6 rounded-2xl bg-white/5 border border-white/5 flex items-center gap-4">
-                      <Zap className="w-5 h-5 text-violet-400 shrink-0" />
-                      <p className="text-[11px] text-white/40 leading-relaxed font-medium">
-                        Launch an instant workspace and invite your team.
-                      </p>
-                    </div>
-
-                    <button 
-                      type="submit" 
-                      disabled={!isHostReady || isNavigating}
-                      className={`w-full h-14 mt-6 rounded-xl font-black uppercase tracking-widest text-xs transition-all flex items-center justify-center gap-2
-                        ${isHostReady 
-                          ? "bg-gradient-to-r from-violet-600 to-indigo-600 text-white hover:scale-[1.02] active:scale-95 shadow-lg shadow-violet-500/10" 
-                          : "bg-white/5 text-white/20 cursor-not-allowed"
-                        }`}
-                    >
-                      <Plus className="w-4 h-4" />
-                      {isNavigating ? "Initializing..." : "Create Room"}
-                    </button>
-                  </form>
-                </CardContent>
+                  <button 
+                    disabled={!isHostReady || isNavigating}
+                    className={`w-full h-14 rounded-2xl font-black uppercase tracking-widest text-xs transition-all flex items-center justify-center gap-3
+                      ${isHostReady ? "bg-gradient-to-r from-violet-600 to-indigo-600 text-white hover:scale-[1.02] shadow-xl shadow-violet-500/20" : "bg-white/5 text-white/20 cursor-not-allowed"}`}
+                  >
+                    {isNavigating ? "Launching..." : "Initialize Room"}
+                    <Plus className="w-4 h-4" />
+                  </button>
+                </form>
               </Card>
             </motion.div>
           </div>
         </div>
       </section>
 
-      {/* Simplified Features Section */}
-      <section id="features" className="py-20 bg-white/[0.01]">
-        <div className="max-w-[1000px] mx-auto px-6">
-          <div className="text-center mb-16">
-            <h2 className="text-3xl font-black mb-4">Powerful Features</h2>
-            <p className="text-white/40 text-sm">Everything you need for seamless teamwork.</p>
+      {/* About Section */}
+      <section id="about" className="py-32 px-6 bg-white/[0.01] border-y border-white/5">
+        <div className="max-w-[1000px] mx-auto grid grid-cols-1 md:grid-cols-2 gap-20 items-center">
+          <div>
+            <span className="text-[10px] font-black uppercase tracking-[0.4em] text-primary mb-6 block">The Platform</span>
+            <h2 className="text-4xl md:text-5xl font-outfit font-black mb-8 leading-tight">Beyond Simple <br /> Communication.</h2>
+            <p className="text-white/40 text-lg leading-relaxed mb-8">
+              CoAct isn't just another messaging tool. It's a real-time interaction engine that synchronizes dozens of high-performance activities across any device instantly.
+            </p>
+            <ul className="space-y-4">
+              {[
+                "Ultra-low latency (<20ms) synchronization",
+                "No installation required - runs in any browser",
+                "Advanced data protection & privacy encryption",
+                "Mobile-first design for participants"
+              ].map((text, i) => (
+                <li key={i} className="flex items-center gap-3 text-sm font-medium text-white/70">
+                  <CheckCircle2 className="w-5 h-5 text-primary" />
+                  {text}
+                </li>
+              ))}
+            </ul>
           </div>
-          
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-            {[
-              { icon: GraduationCap, title: "Classroom", color: "text-blue-400" },
-              { icon: BookOpen, title: "Study", color: "text-green-400" },
-              { icon: Gamepad2, title: "Play", color: "text-purple-400" },
-              { icon: BrainCircuit, title: "Decide", color: "text-orange-400" },
-            ].map((item, i) => (
-              <div key={i} className="p-6 rounded-2xl bg-white/5 border border-white/5 flex flex-col items-center text-center gap-4">
-                <item.icon className={`w-8 h-8 ${item.color}`} />
-                <h3 className="font-bold">{item.title}</h3>
-              </div>
-            ))}
-          </div>
-
-          <div className="mt-20 relative aspect-video rounded-[2rem] overflow-hidden border border-white/10">
-            <Image 
-              src="/activities_banner.png" 
-              alt="Activities" 
-              fill 
-              className="object-cover opacity-60"
-            />
+          <div className="relative aspect-square rounded-[3rem] overflow-hidden border border-white/10 shadow-3xl bg-[#0A0D14]">
+            <Image src="/activities_banner.png" alt="Collaborative Tools" fill className="object-cover opacity-60" />
             <div className="absolute inset-0 bg-gradient-to-t from-[#020617] via-transparent to-transparent" />
           </div>
         </div>
       </section>
 
-      {/* Minimal Footer */}
-      <footer className="py-12 border-t border-white/5 text-center">
-        <div className="relative w-24 h-6 mx-auto opacity-30 mb-6">
+      {/* Feature Section */}
+      <section id="features" className="py-40 px-6">
+        <div className="max-w-[1200px] mx-auto">
+          <div className="text-center mb-24">
+            <h2 className="text-4xl md:text-5xl font-outfit font-black mb-6">Designed for Every Purpose.</h2>
+            <p className="text-white/40 max-w-xl mx-auto">Choose from four distinct modes tailored to your group's specific goals.</p>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
+            {[
+              { icon: GraduationCap, title: "Classroom", desc: "Interactive whiteboards, real-time polls, and QA boards to drive engagement in learning environments.", color: "text-blue-400" },
+              { icon: BookOpen, title: "Group Study", desc: "Co-working spaces with task trackers, focus timers, and shared notes for maximum productivity.", color: "text-green-400" },
+              { icon: Gamepad2, title: "Social Play", desc: "A collection of social games like Word Chain, Antakshari, and Ludo for bonding and ice-breaking.", color: "text-purple-400" },
+              { icon: BrainCircuit, title: "Decision Making", desc: "Thought mapping, debate duels, and courtroom simulations to reach consensus through collaboration.", color: "text-orange-400" },
+            ].map((feature, i) => (
+              <div key={i} className="p-10 rounded-[2.5rem] bg-white/[0.02] border border-white/5 hover:border-white/10 transition-colors">
+                <feature.icon className={`w-10 h-10 mb-8 ${feature.color}`} />
+                <h3 className="text-2xl font-black mb-4">{feature.title}</h3>
+                <p className="text-sm text-white/30 leading-relaxed font-medium">{feature.desc}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* Security Section */}
+      <section id="security" className="py-32 px-6 bg-primary/[0.01]">
+        <div className="max-w-[1000px] mx-auto text-center">
+          <div className="w-20 h-20 rounded-3xl bg-primary/10 flex items-center justify-center text-primary mx-auto mb-10 border border-primary/20">
+            <ShieldCheck className="w-10 h-10" />
+          </div>
+          <h2 className="text-4xl md:text-5xl font-outfit font-black mb-8">Enterprise-Grade Security.</h2>
+          <p className="text-white/50 text-lg max-w-2xl mx-auto mb-16 leading-relaxed">
+            Your data is volatile by design. We use end-to-end socket encryption, and once a session is deleted, every trace of interaction is wiped from our servers instantly.
+          </p>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-8 text-left">
+            {[
+              { title: "Stateless Engine", desc: "We don't store your personal data or conversation logs permanently." },
+              { title: "Encrypted Sockets", desc: "All real-time communication is protected via TLS/SSL encryption." },
+              { title: "Private Access", desc: "Sessions are accessible only via high-entropy unique access codes." }
+            ].map((item, i) => (
+              <div key={i} className="p-8 rounded-3xl bg-white/5 border border-white/5">
+                <h4 className="font-black text-white mb-2 tracking-tight">{item.title}</h4>
+                <p className="text-xs text-white/30 leading-relaxed font-medium">{item.desc}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* Footer */}
+      <footer className="py-20 border-t border-white/5 text-center">
+        <div className="relative w-32 h-8 mx-auto opacity-30 mb-10">
           <Image src="/logo.png" alt="CoAct Logo" fill className="object-contain mix-blend-screen grayscale" />
         </div>
-        <p className="text-[10px] text-white/20 font-black uppercase tracking-widest">© 2026 COACT ENGINE</p>
+        <div className="flex items-center justify-center gap-10 text-[10px] font-black uppercase tracking-[0.4em] text-white/20 mb-10">
+          <span>Real-Time Engine</span>
+          <div className="w-1.5 h-1.5 rounded-full bg-white/5" />
+          <span>Secure Collaboration</span>
+          <div className="w-1.5 h-1.5 rounded-full bg-white/5" />
+          <span>Cloud Infrastructure</span>
+        </div>
+        <p className="text-[10px] text-white/10 font-bold tracking-[0.4em]">© 2026 COACT PLATFORM. DEVELOPED FOR HIGH-STAKES INTERACTION.</p>
       </footer>
     </div>
   );

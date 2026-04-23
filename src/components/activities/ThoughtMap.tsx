@@ -190,12 +190,24 @@ function SharedCanvas({
     if (dragNodeId) {
       const node = nodes.find((n) => n.id === dragNodeId);
       if (node) {
-        socket.emit("thoughtmap:move_node", {
-          sessionId,
-          nodeId: dragNodeId,
-          x: node.x + dx / scale,
-          y: node.y + dy / scale,
-        });
+        const nextX = node.x + dx / scale;
+        const nextY = node.y + dy / scale;
+        
+        // Optimistically update the object property (mutating here for performance since it's about to be replaced by state broadcast anyway)
+        node.x = nextX;
+        node.y = nextY;
+
+        // Throttle emits to every ~50ms
+        const now = Date.now();
+        if (now - (lastTapRef.current.time || 0) > 50) {
+          socket.emit("thoughtmap:move_node", {
+            sessionId,
+            nodeId: dragNodeId,
+            x: nextX,
+            y: nextY,
+          });
+          lastTapRef.current.time = now;
+        }
       }
       return;
     }
@@ -206,6 +218,17 @@ function SharedCanvas({
   };
 
   const onPointerUp = (e: React.PointerEvent) => {
+    if (dragNodeId) {
+      const node = nodes.find((n) => n.id === dragNodeId);
+      if (node) {
+        socket.emit("thoughtmap:move_node", {
+          sessionId,
+          nodeId: dragNodeId,
+          x: node.x,
+          y: node.y,
+        });
+      }
+    }
     activePointersRef.current.delete(e.pointerId);
     if (activePointersRef.current.size < 2) pinchRef.current = null;
     if (activePointersRef.current.size === 0) {
