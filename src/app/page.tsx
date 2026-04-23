@@ -57,62 +57,66 @@ export default function Home() {
     <main className="min-h-screen bg-[#020617] text-white flex flex-col items-center justify-center p-6 relative overflow-hidden">
       {/* Dynamic Background */}
       <div className="absolute inset-0 bg-[#020617]" />
-      <div className="absolute top-0 left-1/4 w-96 h-96 bg-primary/10 rounded-full blur-[120px] pointer-events-none" />
-      <div className="absolute bottom-0 right-1/4 w-96 h-96 bg-violet-500/10 rounded-full blur-[120px] pointer-events-none" />
+      <div className="absolute top-0 left-1/4 w-96 h-96 bg-primary/20 rounded-full blur-[120px] pointer-events-none opacity-50" />
+      <div className="absolute bottom-0 right-1/4 w-96 h-96 bg-violet-500/20 rounded-full blur-[120px] pointer-events-none opacity-50" />
       
-      <div className="w-full max-w-[900px] z-10">
+      {/* Grid Pattern */}
+      <div className="absolute inset-0 bg-[url('https://grainy-gradients.vercel.app/noise.svg')] opacity-20 pointer-events-none mix-blend-overlay" />
+
+      <div className="w-full max-w-[1000px] z-10">
         {/* Header Logo */}
         <motion.div 
           initial={{ y: -20, opacity: 0 }}
           animate={{ y: 0, opacity: 1 }}
-          className="flex justify-center mb-12"
+          className="flex justify-center mb-16"
         >
-          <div className="relative w-48 h-12 md:w-56 md:h-14">
+          <div className="relative w-56 h-14 md:w-64 md:h-16">
             <Image 
               src="/logo.png" 
               alt="CoAct Logo" 
               fill
-              className="object-contain mix-blend-screen scale-110"
+              className="object-contain mix-blend-screen scale-125 transition-transform duration-700 hover:scale-130"
               priority
             />
           </div>
         </motion.div>
 
         {/* Main Grid */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 items-stretch">
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-10 items-stretch">
           {/* Join Session Card */}
           <motion.div
-            initial={{ x: -20, opacity: 0 }}
+            initial={{ x: -40, opacity: 0 }}
             animate={{ x: 0, opacity: 1 }}
-            transition={{ delay: 0.1 }}
+            transition={{ type: "spring", stiffness: 100, damping: 20 }}
           >
-            <Card className="h-full border-white/5 bg-white/[0.03] backdrop-blur-3xl shadow-2xl rounded-[2rem] overflow-hidden group hover:border-primary/30 transition-all duration-500">
-              <CardContent className="p-8 md:p-10 flex flex-col h-full">
-                <div className="mb-8">
-                  <h2 className="text-2xl font-bold text-white mb-1">Join Session</h2>
-                  <p className="text-xs text-white/40 font-bold uppercase tracking-widest">Connect to an active room</p>
+            <Card className="h-full border-white/5 bg-white/[0.02] backdrop-blur-3xl shadow-2xl rounded-[2.5rem] overflow-hidden group hover:border-primary/40 transition-all duration-700 relative">
+              <div className="absolute inset-0 bg-gradient-to-br from-primary/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-700" />
+              <CardContent className="p-10 md:p-12 flex flex-col h-full relative z-10">
+                <div className="mb-10">
+                  <h2 className="text-3xl font-outfit font-black text-white mb-2 tracking-tight">Join Session</h2>
+                  <p className="text-[11px] text-primary font-black uppercase tracking-[0.2em] opacity-70">Connect to an active room</p>
                 </div>
 
-                <form onSubmit={handleJoin} className="space-y-5 flex-1 flex flex-col">
-                  <div className="space-y-4 flex-1">
-                    <div className="space-y-1.5">
-                      <label className="text-[10px] font-black text-white/30 uppercase tracking-widest ml-1">Your Name</label>
+                <form onSubmit={handleJoin} className="space-y-6 flex-1 flex flex-col">
+                  <div className="space-y-5 flex-1">
+                    <div className="space-y-2">
+                      <label className="text-[10px] font-black text-white/40 uppercase tracking-[0.2em] ml-1">Your Identity</label>
                       <Input
                         autoFocus
                         placeholder="e.g. Alex"
-                        className="bg-white/5 border-white/10 h-14 text-white placeholder:text-white/20 focus:border-primary/50 focus:ring-primary/20 rounded-xl transition-all"
+                        className="bg-white/5 border-white/10 h-16 text-white placeholder:text-white/20 focus:border-primary/50 focus:ring-primary/20 rounded-2xl transition-all text-lg"
                         value={joinName}
                         onChange={(e) => setJoinName(e.target.value)}
                         maxLength={20}
                         required
                       />
                     </div>
-                    <div className="space-y-1.5">
-                      <label className="text-[10px] font-black text-white/30 uppercase tracking-widest ml-1">Session Code</label>
+                    <div className="space-y-2">
+                      <label className="text-[10px] font-black text-white/40 uppercase tracking-[0.2em] ml-1">Access Code</label>
                       <div className="relative">
                         <Input
                           placeholder="XJ3K9P"
-                          className="bg-white/5 border-white/10 h-14 uppercase font-mono tracking-[0.3em] text-primary pl-12 text-lg focus:border-primary/50 focus:ring-primary/20 rounded-xl transition-all"
+                          className="bg-white/5 border-white/10 h-16 uppercase font-mono tracking-[0.4em] text-primary pl-14 text-xl focus:border-primary/50 focus:ring-primary/20 rounded-2xl transition-all shadow-inner"
                           value={joinCode}
                           onChange={(e) => setJoinCode(e.target.value.toUpperCase())}
                           maxLength={10}
@@ -126,13 +130,14 @@ export default function Home() {
                   <button 
                     type="submit" 
                     disabled={!isJoinReady || isNavigating}
-                    className={`w-full h-14 mt-8 rounded-xl font-black uppercase tracking-widest text-xs transition-all duration-300 flex items-center justify-center gap-2 group/btn
+                    className={`w-full h-16 mt-10 rounded-2xl font-black uppercase tracking-[0.2em] text-xs transition-all duration-500 flex items-center justify-center gap-3 group/btn relative overflow-hidden
                       ${isJoinReady 
-                        ? "bg-primary text-black shadow-[0_10px_30px_rgba(0,212,255,0.3)] hover:shadow-[0_15px_40px_rgba(0,212,255,0.5)] hover:-translate-y-0.5" 
+                        ? "bg-primary text-black shadow-[0_20px_50px_rgba(0,212,255,0.25)] hover:shadow-[0_25px_60px_rgba(0,212,255,0.4)] hover:-translate-y-1 active:scale-95" 
                         : "bg-white/5 text-white/20 cursor-not-allowed"
                       }`}
                   >
-                    {isNavigating ? "Joining..." : "Join Now"} 
+                    <div className="absolute inset-0 bg-white/20 translate-y-full group-hover/btn:translate-y-0 transition-transform duration-500" />
+                    <span className="relative z-10">{isNavigating ? "Joining..." : "Join Now"}</span>
                     <ArrowRight className={`w-4 h-4 transition-transform ${isJoinReady ? "group-hover:translate-x-1" : ""}`} />
                   </button>
                 </form>
@@ -142,9 +147,9 @@ export default function Home() {
 
           {/* Host Session Card */}
           <motion.div
-            initial={{ x: 20, opacity: 0 }}
+            initial={{ x: 40, opacity: 0 }}
             animate={{ x: 0, opacity: 1 }}
-            transition={{ delay: 0.2 }}
+            transition={{ type: "spring", stiffness: 100, damping: 20, delay: 0.1 }}
           >
             <Card className="h-full border-white/5 bg-white/[0.03] backdrop-blur-3xl shadow-2xl rounded-[2rem] overflow-hidden group hover:border-violet-500/30 transition-all duration-500">
               <CardContent className="p-8 md:p-10 flex flex-col h-full">

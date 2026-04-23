@@ -4,10 +4,10 @@ const { Server } = require('socket.io')
 
 const port = parseInt(process.env.PORT || '3000', 10)
 const dev = process.env.NODE_ENV !== 'production'
-const hostname = '0.0.0.0'
+const hostname = dev ? 'localhost' : '0.0.0.0'
 const server = createServer()
 const path = require('path')
-const app = next({ dev, dir: __dirname, hostname, port })
+const app = next({ dev, dir: __dirname, hostname, port, webpack: true })
 const handle = app.getRequestHandler()
 
 
@@ -16,17 +16,16 @@ app.prepare().then(() => {
     cors: { origin: '*', methods: ['GET', 'POST'] }
   })
 
-  const { parse } = require('url')
   server.on('request', (req, res) => {
-    const parsedUrl = parse(req.url, true)
-    const { pathname } = parsedUrl
-    if (pathname && pathname.startsWith('/socket.io/')) return
-    handle(req, res, parsedUrl)
+    const reqUrl = new URL(req.url || '/', `http://${hostname}:${port}`)
+    if (reqUrl.pathname.startsWith('/socket.io/')) return
+    handle(req, res)
   })
 
   /** @type {Map<string, {id:string, hostId:string, hostName:string, mode:string, status:string, activityData:object, participants:Array, createdAt:number}>} */
   const sessions = new Map()
   const unoTimers = new Map()
+  const wordChainTimers = new Map()
   const ludoPity = new Map() // sessionId -> { playerName -> nonSixCount }
 
   function broadcastState(sessionId) {
@@ -137,6 +136,42 @@ app.prepare().then(() => {
     unoTimers.set(sessionId, { timeout })
   }
 
+  function clearWordChainTimer(sessionId) {
+    const t = wordChainTimers.get(sessionId)
+    if (t) {
+      clearTimeout(t.timeout)
+      wordChainTimers.delete(sessionId)
+    }
+  }
+
+  function startWordChainTimer(sessionId) {
+    clearWordChainTimer(sessionId)
+    const session = sessions.get(sessionId)
+    if (!session || session.mode !== 'wordchain') return
+    const state = session.activityData
+    if (!state || state.status !== 'live' || state.winner) return
+
+    const turnDurationMs = 15000 // 15 seconds
+    state.turnDurationMs = turnDurationMs
+    state.turnEndsAt = Date.now() + turnDurationMs
+    broadcastState(sessionId)
+
+    const timeout = setTimeout(() => {
+      const s = sessions.get(sessionId)
+      if (!s || s.mode !== 'wordchain' || s.activityData.winner) return
+      const data = s.activityData
+      const current = data.participantOrder[data.currentTurnIndex]
+      
+      // Auto-skip and mark as loser if we want, but for now just skip turn
+      io.to(sessionId).emit('wordchain:timeout', { user: current })
+      data.currentTurnIndex = (data.currentTurnIndex + 1) % data.participantOrder.length
+      startWordChainTimer(sessionId)
+      broadcastState(sessionId)
+    }, turnDurationMs)
+
+    wordChainTimers.set(sessionId, { timeout })
+  }
+
   const LUDO_COLORS = ['red', 'blue', 'yellow', 'green']
   const LUDO_START_INDEX = { red: 0, blue: 13, yellow: 26, green: 39 }
   const LUDO_SAFE = [0, 8, 13, 21, 26, 34, 39, 47]
@@ -190,7 +225,140 @@ app.prepare().then(() => {
   }
 
   io.on('connection', (socket) => {
-    console.log('✓ connected', socket.id)
+    // ==========================================
+    // ANTAKSHARI & RMCS GLOBAL LISTENERS
+    // ==========================================
+    socket.on('antakshari:ping', () => {
+      socket.emit('antakshari:pong', { time: Date.now(), socketId: socket.id });
+    });
+
+    socket.on('antakshari:join_team', ({ sessionId, team, targetName }) => {
+      const sId = sessionId || socket.data.sessionId;
+      console.log(`[antakshari] join_team → sess:${sId} team:${team} target:${targetName}`);
+      const session = sessions.get(sId);
+      if (!session) return;
+      
+      const name = targetName || socket.data.name || session.participants.find(p => p.id === socket.id)?.name;
+      if (!name) return;
+
+      if (!session.activityData) session.activityData = {};
+      if (!session.activityData.teams) session.activityData.teams = { A: [], B: [], solo: [] };
+
+      const teams = session.activityData.teams;
+      teams.A = (teams.A || []).filter(n => n !== name);
+      teams.B = (teams.B || []).filter(n => n !== name);
+      teams.solo = (teams.solo || []).filter(n => n !== name);
+
+      if (team === 'A') teams.A.push(name);
+      else if (team === 'B') teams.B.push(name);
+      else teams.solo.push(name);
+
+      broadcastState(sId);
+      socket.emit('session:state', session); // Direct echo for instant feedback
+    });
+
+    socket.on('antakshari:start', ({ sessionId, gameMode }) => {
+      const sId = sessionId || socket.data.sessionId;
+      console.log(`[antakshari] start_arena → sess:${sId} mode:${gameMode}`);
+      const session = sessions.get(sId);
+      if (!session) return;
+
+      const teams = session.activityData.teams || { A: [], B: [], solo: [] };
+      const assignedNames = [...(teams.A || []), ...(teams.B || []), ...(teams.solo || [])];
+      
+      let participants = session.participants.filter(p => 
+        p.isConnected && (assignedNames.includes(p.name) || p.role === 'host' || session.players.includes(p.name))
+      );
+
+      if (participants.length === 0) participants = session.participants.filter(p => p.isConnected);
+
+      console.log(`[antakshari] Starting with ${participants.length} players`);
+
+      session.mode = 'antakshari';
+      session.status = 'live';
+      
+      session.activityData = {
+        gameMode: gameMode || 'solo',
+        players: participants.map(p => ({ 
+          name: p.name, 
+          score: 0, 
+          team: (teams.A || []).includes(p.name) ? 'A' : ((teams.B || []).includes(p.name) ? 'B' : 'solo') 
+        })),
+        teams: teams,
+        turnIndex: 0,
+        currentLetter: "A",
+        history: [],
+        phase: 'singing',
+        timer: 15,
+      };
+
+      const firstPlayer = session.activityData.players[0]?.name;
+      if (firstPlayer) {
+        session.participants.forEach(p => {
+          if (p.role !== 'host') {
+            p.mutedByHost = (p.name !== firstPlayer);
+            if (p.mutedByHost) p.micOn = false;
+          }
+        });
+      }
+
+      broadcastState(sId);
+      socket.emit('session:state', session);
+    });
+
+    socket.on('antakshari:submit', ({ sessionId, text, nextLetter }) => {
+      const sId = sessionId || socket.data.sessionId;
+      console.log(`[antakshari] submission → sess:${sId} text:${text}`);
+      const session = sessions.get(sId);
+      if (!session || !session.activityData.players) return;
+      
+      const data = session.activityData;
+      const currentPlayer = data.players[data.turnIndex];
+      
+      data.players[data.turnIndex].score += 10;
+      data.history.push({ text, author: currentPlayer.name, letter: data.currentLetter });
+      data.currentLetter = nextLetter || "A";
+      data.turnIndex = (data.turnIndex + 1) % data.players.length;
+
+      const nextSinger = data.players[data.turnIndex]?.name;
+      session.participants.forEach(p => {
+        if (p.role !== 'host') {
+          p.mutedByHost = (p.name !== nextSinger);
+          if (p.mutedByHost) p.micOn = false;
+        }
+      });
+
+      broadcastState(sId);
+      socket.emit('session:state', session);
+    });
+
+    socket.on('antakshari:fail', ({ sessionId }) => {
+      const sId = sessionId || socket.data.sessionId;
+      console.log(`[antakshari] turn_fail → sess:${sId}`);
+      const session = sessions.get(sId);
+      if (!session || !session.activityData.players) return;
+
+      const data = session.activityData;
+      const currentPlayer = data.players[data.turnIndex];
+
+      if (data.gameMode === 'teams') {
+        const otherTeam = currentPlayer.team === 'A' ? 'B' : 'A';
+        data.players.forEach(p => { if (p.team === otherTeam) p.score += 5; });
+      }
+
+      data.turnIndex = (data.turnIndex + 1) % data.players.length;
+      const nextSinger = data.players[data.turnIndex]?.name;
+      session.participants.forEach(p => {
+        if (p.role !== 'host') {
+          p.mutedByHost = (p.name !== nextSinger);
+          if (p.mutedByHost) p.micOn = false;
+        }
+      });
+
+      broadcastState(sId);
+      socket.emit('session:state', session);
+    });
+    // ==========================================
 
     socket.on('session:join', ({ sessionId, name, role }) => {
       if (!sessionId || !name) {
@@ -485,17 +653,64 @@ app.prepare().then(() => {
       }
     })
 
+    socket.on('wordchain:start', ({ sessionId }) => {
+      const session = sessions.get(sessionId)
+      if (!session || session.mode !== 'wordchain' || session.hostId !== socket.id) return
+      
+      const players = session.players || []
+      if (players.length < 1) return
+
+      session.status = 'live'
+      session.activityData = {
+        status: 'live',
+        participantOrder: players,
+        currentTurnIndex: 0,
+        words: [],
+        turnDurationMs: 15000,
+        turnEndsAt: Date.now() + 15000
+      }
+      
+      startWordChainTimer(sessionId)
+      broadcastState(sessionId)
+    })
+
     socket.on('wordchain:submit', ({ sessionId, userName, word }) => {
       const session = sessions.get(sessionId)
       if (!session || session.mode !== 'wordchain') return
+      const state = session.activityData
+      if (!state || state.status !== 'live') return
       
-      const activityData = session.activityData
-      if (activityData.participantOrder[activityData.currentTurnIndex] !== userName) return
+      const currentTurn = state.participantOrder[state.currentTurnIndex]
+      if (currentTurn !== userName) return
+
+      state.words.push({ word, author: userName })
+      state.currentTurnIndex = (state.currentTurnIndex + 1) % state.participantOrder.length
       
-      activityData.words.push({ word, author: userName })
-      activityData.currentTurnIndex = (activityData.currentTurnIndex + 1) % activityData.participantOrder.length
-      
-      console.log(`  🔗 ${userName} played "${word}" in ${sessionId}`)
+      startWordChainTimer(sessionId)
+      broadcastState(sessionId)
+    })
+
+    socket.on('wordchain:skip', ({ sessionId }) => {
+      const session = sessions.get(sessionId)
+      if (!session || session.mode !== 'wordchain' || session.hostId !== socket.id) return
+      const state = session.activityData
+      if (!state || state.status !== 'live') return
+
+      state.currentTurnIndex = (state.currentTurnIndex + 1) % state.participantOrder.length
+      startWordChainTimer(sessionId)
+      broadcastState(sessionId)
+    })
+
+    socket.on('wordchain:reset', ({ sessionId }) => {
+      const session = sessions.get(sessionId)
+      if (!session || session.mode !== 'wordchain' || session.hostId !== socket.id) return
+      clearWordChainTimer(sessionId)
+      session.status = 'waiting'
+      session.activityData = {
+        participantOrder: [],
+        currentTurnIndex: 0,
+        words: []
+      }
       broadcastState(sessionId)
     })
 
@@ -844,17 +1059,89 @@ app.prepare().then(() => {
       }
     })
 
+    socket.on('mod:mute_all', ({ sessionId }) => {
+      const session = sessions.get(sessionId)
+      if (!session || session.hostId !== socket.id) return
+      session.participants.forEach(p => {
+        if (p.role !== 'host') {
+          p.mutedByHost = true
+          p.micOn = false
+        }
+      })
+      broadcastState(sessionId)
+    })
+
+    socket.on('mod:unmute_all', ({ sessionId }) => {
+      const session = sessions.get(sessionId)
+      if (!session || session.hostId !== socket.id) return
+      session.participants.forEach(p => {
+        if (p.role !== 'host') {
+          p.mutedByHost = false
+          // We DON'T force micOn to true for privacy, 
+          // just allow them to unmute themselves.
+        }
+      })
+      broadcastState(sessionId)
+    })
+
+    socket.on('wordchain:start', ({ sessionId }) => {
+      const session = sessions.get(sessionId)
+      if (!session || session.mode !== 'wordchain' || session.hostId !== socket.id) return
+      
+      const players = session.players || []
+      if (players.length < 1) return
+
+      session.status = 'live'
+      session.activityData = {
+        status: 'live',
+        participantOrder: players,
+        currentTurnIndex: 0,
+        words: [],
+        turnDurationMs: 15000,
+        turnEndsAt: Date.now() + 15000
+      }
+      
+      startWordChainTimer(sessionId)
+      broadcastState(sessionId)
+    })
+
     socket.on('wordchain:submit', ({ sessionId, userName, word }) => {
       const session = sessions.get(sessionId)
       if (!session || session.mode !== 'wordchain') return
       const state = session.activityData
-      if (!state) return
+      if (!state || state.status !== 'live') return
       
       const currentTurn = state.participantOrder[state.currentTurnIndex]
       if (currentTurn !== userName) return
 
       state.words.push({ word, author: userName })
       state.currentTurnIndex = (state.currentTurnIndex + 1) % state.participantOrder.length
+      
+      startWordChainTimer(sessionId)
+      broadcastState(sessionId)
+    })
+
+    socket.on('wordchain:skip', ({ sessionId }) => {
+      const session = sessions.get(sessionId)
+      if (!session || session.mode !== 'wordchain' || session.hostId !== socket.id) return
+      const state = session.activityData
+      if (!state || state.status !== 'live') return
+
+      state.currentTurnIndex = (state.currentTurnIndex + 1) % state.participantOrder.length
+      startWordChainTimer(sessionId)
+      broadcastState(sessionId)
+    })
+
+    socket.on('wordchain:reset', ({ sessionId }) => {
+      const session = sessions.get(sessionId)
+      if (!session || session.mode !== 'wordchain' || session.hostId !== socket.id) return
+      clearWordChainTimer(sessionId)
+      session.status = 'waiting'
+      session.activityData = {
+        participantOrder: [],
+        currentTurnIndex: 0,
+        words: []
+      }
       broadcastState(sessionId)
     })
 
@@ -897,6 +1184,174 @@ app.prepare().then(() => {
 
     socket.on('voice:signal', ({ sessionId, targetId, signal, callerId, callerName }) => {
       io.to(targetId).emit('voice:signal', { signal, callerId, callerName })
+    })
+
+    // === THOUGHT MAP ATOMIC EVENTS ===
+    socket.on('thoughtmap:add_node', ({ sessionId, node }) => {
+      const session = sessions.get(sessionId)
+      if (!session || session.mode !== 'thoughtmap') return
+      if (!session.activityData.nodes) session.activityData.nodes = []
+      if (!session.activityData.connections) session.activityData.connections = []
+      session.activityData.nodes.push(node)
+      broadcastState(sessionId)
+    })
+
+    socket.on('thoughtmap:move_node', ({ sessionId, nodeId, x, y }) => {
+      const session = sessions.get(sessionId)
+      if (!session || session.mode !== 'thoughtmap') return
+      const node = (session.activityData.nodes || []).find(n => n.id === nodeId)
+      if (node) { node.x = x; node.y = y; broadcastState(sessionId) }
+    })
+
+    socket.on('thoughtmap:update_node', ({ sessionId, nodeId, text, color }) => {
+      const session = sessions.get(sessionId)
+      if (!session || session.mode !== 'thoughtmap') return
+      const node = (session.activityData.nodes || []).find(n => n.id === nodeId)
+      if (node) {
+        if (text !== undefined) node.text = text
+        if (color !== undefined) node.color = color
+        broadcastState(sessionId)
+      }
+    })
+
+    socket.on('thoughtmap:delete_node', ({ sessionId, nodeId }) => {
+      const session = sessions.get(sessionId)
+      if (!session || session.mode !== 'thoughtmap') return
+      session.activityData.nodes = (session.activityData.nodes || []).filter(n => n.id !== nodeId)
+      session.activityData.connections = (session.activityData.connections || []).filter(c => c.from !== nodeId && c.to !== nodeId)
+      broadcastState(sessionId)
+    })
+
+    socket.on('thoughtmap:add_connection', ({ sessionId, connection }) => {
+      const session = sessions.get(sessionId)
+      if (!session || session.mode !== 'thoughtmap') return
+      if (!session.activityData.connections) session.activityData.connections = []
+      const exists = session.activityData.connections.some(c => c.from === connection.from && c.to === connection.to)
+      if (!exists) { session.activityData.connections.push(connection); broadcastState(sessionId) }
+    })
+
+    socket.on('thoughtmap:delete_connection', ({ sessionId, connectionId }) => {
+      const session = sessions.get(sessionId)
+      if (!session || session.mode !== 'thoughtmap') return
+      session.activityData.connections = (session.activityData.connections || []).filter(c => c.id !== connectionId)
+      broadcastState(sessionId)
+    })
+
+    // === DUEL DEBATE ATOMIC EVENTS ===
+    socket.on('duel:assign_role', ({ sessionId, targetName, role }) => {
+      const session = sessions.get(sessionId)
+      if (!session || session.mode !== 'duel' || session.hostId !== socket.id) return
+      if (!session.activityData.roles) session.activityData.roles = {}
+      session.activityData.roles[targetName] = role
+      broadcastState(sessionId)
+    })
+
+    socket.on('duel:vote', ({ sessionId, userName, team }) => {
+      const session = sessions.get(sessionId)
+      if (!session || session.mode !== 'duel') return
+      if (!session.activityData.biasVotes) session.activityData.biasVotes = {}
+      session.activityData.biasVotes[userName] = team
+      broadcastState(sessionId)
+    })
+
+    // === COURTROOM ATOMIC EVENTS ===
+    socket.on('courtroom:assign_role', ({ sessionId, targetName, role }) => {
+      const session = sessions.get(sessionId)
+      if (!session || session.mode !== 'courtroom' || session.hostId !== socket.id) return
+      if (!session.activityData.assignedRoles) session.activityData.assignedRoles = { judge: null, prosecution: [], defense: [] }
+      const r = session.activityData.assignedRoles
+      if (r.judge === targetName) r.judge = null
+      if (Array.isArray(r.prosecution)) r.prosecution = r.prosecution.filter(n => n !== targetName)
+      if (Array.isArray(r.defense)) r.defense = r.defense.filter(n => n !== targetName)
+      if (role === 'judge') r.judge = targetName
+      else if (role === 'prosecution') { if (!Array.isArray(r.prosecution)) r.prosecution = []; r.prosecution.push(targetName) }
+      else if (role === 'defense') { if (!Array.isArray(r.defense)) r.defense = []; r.defense.push(targetName) }
+      broadcastState(sessionId)
+    })
+
+    socket.on('courtroom:vote', ({ sessionId, userName, side }) => {
+      const session = sessions.get(sessionId)
+      if (!session || session.mode !== 'courtroom') return
+      if (!session.activityData.votes) session.activityData.votes = {}
+      session.activityData.votes[userName] = side
+      broadcastState(sessionId)
+    })
+
+    // === RMCS ATOMIC EVENTS ===
+    socket.on('rmcs:start', ({ sessionId }) => {
+      const session = sessions.get(sessionId)
+      if (!session || session.hostId !== socket.id) return
+      
+      const players = session.participants.filter(p => p.isConnected && session.players.includes(p.name))
+      if (players.length !== 4) return // RMCS is typically 4 players
+
+      const roles = ['Raja', 'Mantri', 'Chor', 'Sipahi']
+      const shuffledRoles = shuffle([...roles])
+      
+      session.mode = 'rmcs'
+      session.status = 'live'
+      session.activityData = {
+        players: players.map((p, i) => ({ 
+          name: p.name, 
+          role: shuffledRoles[i], 
+          score: 0,
+          currentRoundScore: 0,
+          guess: null
+        })),
+        round: 1,
+        totalRounds: 7,
+        phase: 'assignment', // assignment | guessing | reveal
+        winner: null
+      }
+      broadcastState(sessionId)
+    })
+
+    socket.on('rmcs:guess', ({ sessionId, guessName }) => {
+      const session = sessions.get(sessionId)
+      if (!session || session.mode !== 'rmcs') return
+      const data = session.activityData
+      const sipahi = data.players.find(p => p.role === 'Sipahi')
+      if (sipahi.name !== socket.data.name) return
+
+      const chor = data.players.find(p => p.role === 'Chor')
+      const isCorrect = guessName === chor.name
+      
+      data.players.forEach(p => {
+        if (p.role === 'Raja') p.currentRoundScore = 100
+        if (p.role === 'Mantri') p.currentRoundScore = 50
+        if (p.role === 'Sipahi') p.currentRoundScore = isCorrect ? 50 : 0
+        if (p.role === 'Chor') p.currentRoundScore = isCorrect ? 0 : 100
+        
+        p.score += p.currentRoundScore
+      })
+
+      data.phase = 'reveal'
+      data.lastGuess = { guesser: sipahi.name, target: guessName, isCorrect }
+      broadcastState(sessionId)
+    })
+
+    socket.on('rmcs:next_round', ({ sessionId }) => {
+      const session = sessions.get(sessionId)
+      if (!session || session.mode !== 'rmcs' || session.hostId !== socket.id) return
+      const data = session.activityData
+
+      if (data.round >= data.totalRounds) {
+        data.status = 'ended'
+        const winner = [...data.players].sort((a, b) => b.score - a.score)[0]
+        data.winner = winner.name
+      } else {
+        data.round++
+        const roles = ['Raja', 'Mantri', 'Chor', 'Sipahi']
+        const shuffledRoles = shuffle([...roles])
+        data.players.forEach((p, i) => {
+          p.role = shuffledRoles[i]
+          p.currentRoundScore = 0
+          p.guess = null
+        })
+        data.phase = 'assignment'
+        data.lastGuess = null
+      }
+      broadcastState(sessionId)
     })
 
     socket.on('disconnect', () => {
@@ -943,7 +1398,7 @@ app.prepare().then(() => {
     })
   })
 
-  const host = '0.0.0.0'
+  const host = 'localhost'
   server.listen(port, host, (err) => {
     if (err) throw err
     console.log(`> Ready on http://${host}:${port}`)

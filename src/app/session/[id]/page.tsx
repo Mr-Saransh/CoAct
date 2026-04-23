@@ -9,6 +9,8 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { WifiOff, ArrowRight, Users, MessageCircle, Mic } from "lucide-react";
+import { motion, AnimatePresence } from "framer-motion";
+import { Skeleton } from "@/components/ui/skeleton";
 import { ThinkingBoard } from "@/components/activities/ThinkingBoard";
 import { LivePollParticipant } from "@/components/activities/LivePoll";
 import { QuizParticipant } from "@/components/activities/Quiz";
@@ -28,6 +30,9 @@ import { ThoughtMapParticipant } from "@/components/activities/ThoughtMap";
 import { CourtroomParticipant } from "@/components/activities/CourtroomMode";
 import { DuelDebateParticipant } from "@/components/activities/DuelDebate";
 import { DecisionEngineParticipant } from "@/components/activities/DecisionEngine";
+
+import Antakshari from "@/components/activities/Antakshari";
+import RMCSGame from "@/components/activities/RMCSGame";
 
 
 function LoadingSpinner() {
@@ -96,44 +101,56 @@ function Lobby({ session, userName, socket }: {
   const others = session.participants.filter((p) => p.id !== undefined && p.name !== userName && p.role !== "host");
 
   return (
-    <div className="min-h-[100dvh] flex items-center justify-center p-4 relative bg-[#020617] isolate">
-      <div className="fixed inset-0 pointer-events-none -z-10 bg-[#020617] bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-[#1e1b4b]/20 via-[#020617] to-[#020617]" />
+    <div className="min-h-[100dvh] flex items-center justify-center p-6 relative bg-[#020617] overflow-hidden isolate">
+      {/* Background Orbs */}
+      <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[600px] h-[600px] bg-primary/10 rounded-full blur-[140px] pointer-events-none -z-10" />
+      <div className="absolute bottom-0 right-0 w-[400px] h-[400px] bg-violet-500/10 rounded-full blur-[120px] pointer-events-none -z-10" />
 
-      <div className="w-full max-w-md z-10 relative">
-        <Card className="border-white/5 bg-[#121826]/80 backdrop-blur-xl shadow-2xl overflow-hidden text-white relative z-20 rounded-[2rem]">
-          <CardContent className="p-10 text-center">
-            <div className="w-20 h-20 rounded-full bg-gradient-to-br from-primary to-violet-500 flex items-center justify-center mx-auto mb-6 shadow-[0_0_40px_rgba(0,212,255,0.3)]">
-              <span className="text-3xl font-black text-black">{userName[0].toUpperCase()}</span>
-            </div>
+      <div className="w-full max-w-lg z-10 relative">
+        <motion.div
+          initial={{ y: 20, opacity: 0 }}
+          animate={{ y: 0, opacity: 1 }}
+          transition={{ type: "spring", damping: 25, stiffness: 200 }}
+        >
+          <Card className="border-white/5 bg-[#121826]/40 backdrop-blur-3xl shadow-[0_32px_64px_-12px_rgba(0,0,0,0.8)] overflow-hidden text-white relative z-20 rounded-[3rem] ring-1 ring-white/10">
+            <CardContent className="p-12 text-center relative overflow-hidden">
+              {/* Subtle Animated Glow */}
+              <div className="absolute -top-24 -left-24 w-48 h-48 bg-primary/20 rounded-full blur-[60px] animate-pulse" />
+              
+              <div className="relative z-10">
+                <div className="w-24 h-24 rounded-3xl bg-gradient-to-br from-primary to-blue-600 flex items-center justify-center mx-auto mb-8 shadow-2xl rotate-3 transform group-hover:rotate-0 transition-transform duration-500">
+                  <span className="text-4xl font-black text-black">{userName[0].toUpperCase()}</span>
+                </div>
 
-            <h2 className="text-3xl font-outfit font-black mb-2 italic">You're In!</h2>
-            <p className="text-white/40 text-xs mb-8 font-bold uppercase tracking-widest">
-              Waiting for host <strong className="text-white">{session.hostName || "Host"}</strong> to start
-            </p>
+                <h2 className="text-4xl font-outfit font-black mb-3 tracking-tight">You're In!</h2>
+                <p className="text-white/40 text-[10px] mb-10 font-black uppercase tracking-[0.3em]">
+                  Waiting for <span className="text-primary">{session.hostName || "Host"}</span> to launch
+                </p>
 
-            {others.length > 0 && (
-              <div className="text-left mb-8 bg-white/5 p-4 rounded-2xl border border-white/5">
-                <p className="text-[10px] font-black uppercase tracking-[0.2em] text-white/40 mb-3 text-center">Others in Lobby ({others.length})</p>
-                <div className="flex flex-wrap justify-center gap-2">
-                  {others.map((p) => (
-                    <div key={p.id} className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-white/5 border border-white/5 text-xs font-bold shadow-sm">
-                      <div className="w-1.5 h-1.5 rounded-full bg-green-400 shadow-[0_0_8px_rgba(74,222,128,0.8)]" />
-                      {p.name}
+                {others.length > 0 && (
+                  <div className="text-left mb-10 bg-white/[0.03] p-6 rounded-[2rem] border border-white/5">
+                    <p className="text-[10px] font-black uppercase tracking-[0.2em] text-white/30 mb-4 text-center">Colleagues in Lobby ({others.length})</p>
+                    <div className="flex flex-wrap justify-center gap-3">
+                      {others.map((p) => (
+                        <div key={p.id} className="flex items-center gap-2.5 px-4 py-2 rounded-full bg-white/5 border border-white/10 text-xs font-bold shadow-sm hover:bg-white/10 transition-colors">
+                          <div className="w-2 h-2 rounded-full bg-green-400 shadow-[0_0_12px_rgba(74,222,128,0.6)]" />
+                          {p.name}
+                        </div>
+                      ))}
                     </div>
-                  ))}
+                  </div>
+                )}
+
+                <div className="flex justify-center">
+                  <div className="flex items-center gap-3 bg-black/40 px-6 py-3 rounded-full border border-white/5 shadow-inner">
+                    <div className="w-2 h-2 rounded-full bg-green-500 animate-pulse shadow-[0_0_10px_rgba(34,197,94,0.5)]" />
+                    <span className="text-[10px] font-black text-white/40 uppercase tracking-[0.3em]">Securely Connected</span>
+                  </div>
                 </div>
               </div>
-            )}
-
-            <div className="flex justify-center mt-6">
-              <div className="flex items-center gap-2 bg-black/50 px-4 py-2 rounded-full border border-white/10">
-                <div className="w-2 h-2 rounded-full bg-green-500 animate-pulse" />
-                <span className="text-[10px] font-black text-white/60 uppercase tracking-widest">Live Connection</span>
-              </div>
-            </div>
-          </CardContent>
-          <div className="absolute inset-0 bg-gradient-to-b from-transparent to-black/20 pointer-events-none" />
-        </Card>
+            </CardContent>
+          </Card>
+        </motion.div>
       </div>
       
       <SessionControls session={session} socket={socket} userName={userName} isHost={false} onLeave={() => window.location.href = "/"} onBack={() => {}} />
@@ -166,6 +183,8 @@ function ActivityView({ session, userName, socket }: {
     if (mode === "courtroom") return <CourtroomParticipant session={session} socket={socket} userName={userName} />;
     if (mode === "duel") return <DuelDebateParticipant session={session} socket={socket} userName={userName} />;
     if (mode === "decision") return <DecisionEngineParticipant session={session} socket={socket} userName={userName} />;
+    if (mode === "antakshari") return <Antakshari session={session} socket={socket} userName={userName} isHost={false} />;
+    if (mode === "rmcs") return <RMCSGame session={session} socket={socket} userName={userName} isHost={false} />;
 
     return (
       <div className="w-full max-w-2xl text-center p-8 bg-[#121826] rounded-3xl border border-white/10 relative z-20">
@@ -186,6 +205,7 @@ function ActivityView({ session, userName, socket }: {
               src="/logo.png" 
               alt="CoAct Logo" 
               fill
+              sizes="(max-width: 768px) 112px, 160px"
               className="object-contain mix-blend-screen"
               priority
             />
@@ -197,7 +217,18 @@ function ActivityView({ session, userName, socket }: {
       </header>
 
       <div className={`flex-1 w-full flex items-center justify-center relative z-10 ${session.mode === 'board' ? '' : 'pt-16 pb-20 px-4'}`}>
-        {renderActivity()}
+        <AnimatePresence mode="wait">
+          <motion.div
+            key={session.mode}
+            initial={{ opacity: 0, scale: 0.98, filter: "blur(10px)" }}
+            animate={{ opacity: 1, scale: 1, filter: "blur(0px)" }}
+            exit={{ opacity: 0, scale: 1.02, filter: "blur(10px)" }}
+            transition={{ duration: 0.4, ease: [0.16, 1, 0.3, 1] }}
+            className="w-full h-full flex items-center justify-center"
+          >
+            {renderActivity()}
+          </motion.div>
+        </AnimatePresence>
       </div>
 
       <SessionControls session={session} socket={socket} userName={userName} isHost={false} onLeave={() => window.location.href = "/"} onBack={() => {}} />
@@ -250,9 +281,16 @@ function SessionContent() {
 
   if (!isConnected || !session) {
     return (
-      <div className="min-h-[100dvh] flex flex-col items-center justify-center bg-[#020617] text-white isolate">
-        <LoadingSpinner />
-        <p className="text-white/40 text-sm font-bold uppercase mt-4">Connecting...</p>
+      <div className="min-h-[100dvh] bg-[#020617] p-8 flex flex-col items-center justify-center space-y-6">
+        <Skeleton className="w-20 h-20 rounded-full" />
+        <div className="space-y-2 w-full max-w-xs">
+          <Skeleton className="h-6 w-3/4 mx-auto" />
+          <Skeleton className="h-4 w-1/2 mx-auto" />
+        </div>
+        <div className="grid grid-cols-2 gap-4 w-full max-w-sm mt-8">
+          <Skeleton className="h-12 rounded-xl" />
+          <Skeleton className="h-12 rounded-xl" />
+        </div>
       </div>
     );
   }

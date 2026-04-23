@@ -9,8 +9,9 @@ import { useSocket } from "@/components/providers/SocketProvider";
 import {
   GraduationCap, BookOpen, Gamepad2, Scale,
   ChevronRight, HelpCircle, Zap, User, MonitorSmartphone, ShieldCheck,
-  Crown, X, Settings, UsersRound, Volume2, VolumeX, StopCircle, Network, BrainCircuit, Swords
+  Crown, X, Settings, UsersRound, Volume2, VolumeX, StopCircle, Network, BrainCircuit, Swords, Loader2
 } from "lucide-react";
+import { Skeleton } from "@/components/ui/skeleton";
 import { motion, AnimatePresence } from "framer-motion";
 import { ThinkingBoard } from "@/components/activities/ThinkingBoard";
 import { LivePollHost } from "@/components/activities/LivePoll";
@@ -31,13 +32,16 @@ import { DuelDebateHost } from "@/components/activities/DuelDebate";
 import { DecisionEngineHost } from "@/components/activities/DecisionEngine";
 import { SessionControls } from "@/components/session/SessionControls";
 
+import Antakshari from "@/components/activities/Antakshari";
+import RMCSGame from "@/components/activities/RMCSGame";
+
 const QRCodeSVG = dynamic(() => import("qrcode.react").then((m) => m.QRCodeSVG), {
   ssr: false,
   loading: () => <div className="w-36 h-36 bg-white/10 rounded-xl" />,
 });
 
 const ACTIVITIES = {
-  learn: [
+  classroom: [
     { id: "poll",  label: "Live Poll",        desc: "Ask a question, get real-time votes.", icon: GraduationCap, image: "/learn/poll.jpg" },
     { id: "quiz",  label: "Quiz Battle",      desc: "Timed quiz with live leaderboard.", icon: GraduationCap, image: "/learn/quiz.jpg" },
     { id: "qa",    label: "Q&A Board",        desc: "Collect live audience questions.", icon: GraduationCap, image: "/learn/qa.jpg" },
@@ -53,6 +57,8 @@ const ACTIVITIES = {
     { id: "trivia",    label: "Trivia Night",    desc: "Challenge your group with fast-paced general knowledge.", icon: Gamepad2, image: "/games/trivia.jpg" },
     { id: "wordchain", label: "Word Chain",      desc: "A fast-thinking vocabulary game for the whole team.", icon: Gamepad2, image: "/games/wordchain.jpg" },
     { id: "mostlikely",label: "Most Likely To",  desc: "Discover what your friends really think with fun group votes.", icon: Gamepad2, image: "/games/mostlikely.jpg" },
+    { id: "antakshari",label: "Antakshari",      desc: "Voice-first singing battle. Showcase your talent!", icon: Gamepad2, image: "/games/antakshari.jpg" },
+    { id: "rmcs",      label: "RMCS Royale",     desc: "Raja Mantri Chor Sipahi - The classic social deduction game.", icon: Gamepad2, image: "/games/rmcs.jpg" },
     { id: "uno",       label: "UNO Cards",       desc: "The classic card game experience, now fully real-time.", icon: Gamepad2, image: "/games/uno.jpg" },
     { id: "ludo",      label: "Ludo Royale",     desc: "A premium, high-fidelity board game for up to 4 players.", icon: Gamepad2, image: "/games/ludo.jpg" },
   ],
@@ -65,7 +71,7 @@ const ACTIVITIES = {
 } as const;
 
 const CATEGORY_INFO = {
-  learn: { title: "Learn", desc: "Engage your audience with live polls, quizzes, Q&A and more.", icon: GraduationCap, color: "blue" },
+  classroom: { title: "Classroom", desc: "Engage your audience with live polls, quizzes, Q&A and more.", icon: GraduationCap, color: "blue" },
   study: { title: "Study", desc: "Collaborate, assign tasks and track study progress together.", icon: BookOpen, color: "green" },
   play: { title: "Play", desc: "Make learning fun with quizzes, games and challenges.", icon: Gamepad2, color: "purple" },
   decide: { title: "Decide", desc: "Structured tools to discuss, debate and reach fair decisions.", icon: Scale, color: "orange" }
@@ -123,9 +129,13 @@ function HostSessionContent() {
   const { session, startActivity, updateActivity, endActivity, isConnected } = useSession(sessionId, hostName, "host");
   const [inviteOpen, setInviteOpen] = useState(false);
   const [isRedirecting, setIsRedirecting] = useState(false);
-  const [activeCategory, setActiveCategory] = useState<keyof typeof ACTIVITIES>("learn");
+  const [activeCategory, setActiveCategory] = useState<keyof typeof ACTIVITIES>("classroom");
   const [showSidebar, setShowSidebar] = useState(false);
   const [isMuted, setIsMuted] = useState(false);
+
+  const setCategory = (cat: keyof typeof ACTIVITIES) => {
+    setActiveCategory(cat);
+  };
 
   const safeNavigate = useCallback((target: string) => {
     if (isRedirecting) return;
@@ -177,10 +187,12 @@ function HostSessionContent() {
         />
       )}
       
-      {/* Top Header */}
-      <header className="h-16 md:h-14 border-b border-white/5 flex items-center justify-between px-4 shrink-0 bg-[#0A0D14]/80 backdrop-blur-md z-40">
-        <div className="flex items-center gap-2">
-          <div className="relative w-28 h-8 md:w-40 md:h-12">
+      {/* Premium Header */}
+      <header className="h-20 border-b border-white/5 flex items-center justify-between px-8 shrink-0 bg-[#0A0D14]/40 premium-blur z-[100] relative">
+        <div className="absolute inset-x-0 bottom-0 h-px bg-gradient-to-r from-transparent via-primary/20 to-transparent" />
+        
+        <div className="flex items-center gap-6">
+          <div className="relative w-36 h-10 transition-transform duration-500 hover:scale-105">
             <Image 
               src="/logo.png" 
               alt="CoAct Logo" 
@@ -189,20 +201,23 @@ function HostSessionContent() {
               priority
             />
           </div>
-          <div className="hidden sm:block w-px h-6 bg-white/10 mx-2" />
-          <div className="hidden sm:flex items-center gap-2">
-            <span className="font-mono text-xs md:text-sm text-white/40">ID:</span>
-            <span className="font-mono text-sm md:text-lg font-bold text-[#00D4FF] uppercase">{sessionId}</span>
+          <div className="h-6 w-px bg-white/10" />
+          <div className="flex items-center gap-3 bg-white/5 px-4 py-2 rounded-full border border-white/10 group cursor-default">
+            <span className="text-[10px] font-black text-white/30 uppercase tracking-[0.2em] group-hover:text-primary transition-colors">Session ID</span>
+            <span className="font-mono text-sm font-black text-primary uppercase tracking-widest">{sessionId}</span>
           </div>
         </div>
 
         <div className="flex items-center gap-6">
-          <div className="flex items-center gap-4">
-            <div className="flex items-center gap-2">
-              <div className="w-2 h-2 rounded-full bg-green-500" />
-              <span className="text-sm text-white/60">{joinedCount} Joined</span>
+          <div className="flex items-center gap-8">
+            <div className="flex flex-col items-end">
+              <span className="text-[10px] font-black text-white/30 uppercase tracking-[0.2em]">Participants</span>
+              <div className="flex items-center gap-2 mt-0.5">
+                <div className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse shadow-[0_0_10px_rgba(34,197,94,0.5)]" />
+                <span className="text-sm font-black text-white">{joinedCount} Online</span>
+              </div>
             </div>
-            <div className="w-8 h-8 rounded-full bg-[#4F46E5] flex items-center justify-center text-xs font-bold text-white">
+            <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-primary to-blue-600 flex items-center justify-center text-sm font-black text-black shadow-lg shadow-primary/10">
               {hostName.charAt(0).toUpperCase()}
             </div>
           </div>
@@ -214,9 +229,11 @@ function HostSessionContent() {
         initial={{ x: -20, opacity: 0 }}
         animate={{ x: showSidebar ? -100 : 0, opacity: 1 }}
         onClick={() => setShowSidebar(true)}
-        className="fixed left-0 top-1/2 -translate-y-1/2 z-[60] bg-primary text-black w-8 h-16 rounded-r-2xl flex items-center justify-center shadow-2xl hover:w-10 transition-all group"
+        className="fixed left-0 top-1/2 -translate-y-1/2 z-[60] bg-white/5 border border-white/10 hover:border-primary/50 text-primary w-10 h-24 rounded-r-[2rem] flex flex-col items-center justify-center gap-2 shadow-2xl backdrop-blur-xl transition-all group overflow-hidden"
       >
-        <ChevronRight className="w-6 h-6 group-hover:scale-110 transition-transform" />
+        <div className="absolute inset-0 bg-primary/10 -translate-x-full group-hover:translate-x-0 transition-transform duration-500" />
+        <UsersRound className="w-4 h-4 group-hover:scale-110 transition-transform relative z-10" />
+        <ChevronRight className="w-4 h-4 group-hover:translate-x-1 transition-transform relative z-10" />
       </motion.button>
 
       <div className="flex-1 flex min-h-0 relative">
@@ -230,15 +247,15 @@ function HostSessionContent() {
                 animate={{ opacity: 1 }}
                 exit={{ opacity: 0 }}
                 onClick={() => setShowSidebar(false)}
-                className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[70] lg:hidden"
+                className="fixed inset-0 bg-black/80 backdrop-blur-md z-[110] lg:hidden"
               />
               
               <motion.aside 
-                initial={{ x: -320 }}
+                initial={{ x: -400 }}
                 animate={{ x: 0 }}
-                exit={{ x: -320 }}
-                transition={{ type: "spring", damping: 25, stiffness: 200 }}
-                className="fixed lg:relative left-0 top-0 bottom-0 z-[80] w-[320px] bg-[#0A0D14] border-r border-white/5 p-4 flex flex-col gap-4 shadow-2xl overflow-hidden"
+                exit={{ x: -400 }}
+                transition={{ type: "spring", damping: 30, stiffness: 300 }}
+                className="fixed lg:relative left-0 top-0 bottom-0 z-[120] w-[360px] bg-[#0A0D14]/90 premium-blur border-r border-white/5 p-6 flex flex-col gap-6 shadow-2xl overflow-hidden"
               >
                 <div className="flex items-center justify-between mb-2">
                   <span className="text-xs font-black text-white/40 uppercase tracking-[0.2em]">Live Session</span>
@@ -351,7 +368,7 @@ function HostSessionContent() {
               currentMode === "focus" ? <FocusTimerHost session={session} updateActivity={updateActivity} /> :
               currentMode === "tasks" ? <TaskTrackerHost session={session} updateActivity={updateActivity} /> :
               currentMode === "fitb" ? <FITBHost session={session} updateActivity={updateActivity} /> :
-              currentMode === "wordchain" ? <WordChainHost session={session} updateActivity={updateActivity} /> :
+              currentMode === "wordchain" ? <WordChainHost session={session} socket={socket} userName={hostName} updateActivity={updateActivity} /> :
               currentMode === "mostlikely" ? <MostLikelyHost session={session} updateActivity={updateActivity} /> :
               currentMode === "study" ? <GroupStudyHost session={session} updateActivity={updateActivity} /> :
               currentMode === "uno" ? <UnoHost session={session} socket={socket} /> :
@@ -360,6 +377,8 @@ function HostSessionContent() {
               currentMode === "courtroom" ? <CourtroomHost session={session} updateActivity={updateActivity} /> :
               currentMode === "duel" ? <DuelDebateHost session={session} socket={socket} updateActivity={updateActivity} /> :
               currentMode === "decision" ? <DecisionEngineHost session={session} updateActivity={updateActivity} /> :
+              currentMode === "antakshari" ? <Antakshari session={session} socket={socket} userName={hostName} isHost={true} /> :
+              currentMode === "rmcs" ? <RMCSGame session={session} socket={socket} userName={hostName} isHost={true} /> :
               null}
             </div>
           ) : (
@@ -371,7 +390,7 @@ function HostSessionContent() {
 
               {/* Category Cards */}
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6 mb-8">
-                {(Object.entries(CATEGORY_INFO) as [keyof typeof ACTIVITIES, typeof CATEGORY_INFO['learn']][]).map(([key, info]) => {
+                {(Object.entries(CATEGORY_INFO) as [keyof typeof ACTIVITIES, typeof CATEGORY_INFO['classroom']][]).map(([key, info]) => {
                   const isActive = activeCategory === key;
                   const IconComponent = info.icon;
                   
@@ -422,7 +441,7 @@ function HostSessionContent() {
 
               {/* Selected Category Area */}
               <div className={`border rounded-[32px] md:rounded-[40px] p-4 md:p-8 mb-8 flex-1 transition-all duration-500 glass-card
-                ${activeCategory === 'learn' ? 'border-blue-500/30 shadow-[0_0_50px_rgba(59,130,246,0.1)]' : 
+                ${activeCategory === 'classroom' ? 'border-blue-500/30 shadow-[0_0_50px_rgba(59,130,246,0.1)]' : 
                   activeCategory === 'study' ? 'border-green-500/30 shadow-[0_0_50px_rgba(34,197,94,0.1)]' : 
                   activeCategory === 'play' ? 'border-purple-500/30 shadow-[0_0_50px_rgba(168,85,247,0.1)]' : 
                   'border-orange-500/30 shadow-[0_0_50px_rgba(249,115,22,0.1)]'} bg-white/[0.02] backdrop-blur-3xl`}
@@ -430,7 +449,7 @@ function HostSessionContent() {
                 <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 mb-8 md:mb-10">
                   <div className="flex items-center gap-4 md:gap-6">
                     <div className={`w-16 h-16 rounded-[24px] flex items-center justify-center transition-all duration-500
-                      ${activeCategory === 'learn' ? 'bg-blue-500/20 text-blue-400' : 
+                      ${activeCategory === 'classroom' ? 'bg-blue-500/20 text-blue-400' : 
                         activeCategory === 'study' ? 'bg-green-500/20 text-green-400' : 
                         activeCategory === 'play' ? 'bg-purple-500/20 text-purple-400' : 
                         'bg-orange-500/20 text-orange-400'}`}
@@ -452,85 +471,97 @@ function HostSessionContent() {
                   </button>
                 </div>
 
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-6">
-                  {ACTIVITIES[activeCategory].map(act => {
-                    const ActIcon = act.icon;
-                    const hasImage = !!(act as any).image;
+                <AnimatePresence mode="wait">
+                  <motion.div 
+                    key={activeCategory}
+                    initial={{ opacity: 0, x: 20 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    exit={{ opacity: 0, x: -20 }}
+                    transition={{ duration: 0.3, ease: "easeOut" }}
+                    className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-6"
+                  >
+                    {ACTIVITIES[activeCategory].map(act => {
+                      const ActIcon = act.icon;
+                      const hasImage = !!(act as any).image;
 
-                    return (
-                      <div 
-                        key={act.id} 
-                        className={`group cursor-pointer transition-all duration-300 hover:-translate-y-2`} 
-                        onClick={() => {
-                          const needsSetup = ["poll", "quiz", "qa", "fitb", "trivia", "wordchain", "mostlikely", "study", "uno", "ludo", "thoughtmap", "courtroom", "duel", "decision"];
-                          startActivity(act.id as never, {}, needsSetup.includes(act.id) ? "waiting" : "live");
-                        }}
-                      >
-                        {hasImage ? (
-                          <div className="flex flex-col gap-5">
-                            <div className={`aspect-square rounded-[32px] overflow-hidden border border-white/10 relative transition-all duration-500 shadow-2xl bg-black/20 group-hover:border-${CATEGORY_INFO[activeCategory].color}-500/50 group-hover:shadow-[0_0_40px_rgba(255,255,255,0.05)]`}>
-                              <img 
-                                src={(act as any).image} 
-                                alt={act.label} 
-                                className="absolute inset-0 w-full h-full object-contain p-2 transition-all duration-700 group-hover:scale-105 saturate-[1.1]" 
-                              />
-                              <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
-                              <div className={`absolute bottom-5 right-5 w-12 h-12 rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 translate-y-4 group-hover:translate-y-0 transition-all duration-500 shadow-2xl
-                                ${activeCategory === 'learn' ? 'bg-blue-500 text-white' : 
-                                  activeCategory === 'study' ? 'bg-green-500 text-white' : 
-                                  activeCategory === 'play' ? 'bg-purple-500 text-white' : 
-                                  'bg-orange-500 text-white'}`}
-                              >
-                                <ChevronRight className="w-7 h-7" />
+                      return (
+                        <motion.div 
+                          key={act.id} 
+                          layout
+                          initial={{ opacity: 0, scale: 0.9 }}
+                          animate={{ opacity: 1, scale: 1 }}
+                          className={`group cursor-pointer transition-all duration-300 hover:-translate-y-2`} 
+                          onClick={() => {
+                            const needsSetup = ["poll", "quiz", "qa", "fitb", "trivia", "wordchain", "mostlikely", "study", "uno", "ludo", "thoughtmap", "courtroom", "duel", "decision", "antakshari", "rmcs"];
+                            startActivity(act.id as never, {}, needsSetup.includes(act.id) ? "waiting" : "live");
+                          }}
+                        >
+                          {hasImage ? (
+                            <div className="flex flex-col gap-5">
+                              <div className={`aspect-square rounded-[32px] overflow-hidden border border-white/10 relative transition-all duration-500 shadow-2xl bg-black/20 group-hover:border-${CATEGORY_INFO[activeCategory].color}-500/50 group-hover:shadow-[0_0_40px_rgba(255,255,255,0.05)]`}>
+                                <img 
+                                  src={(act as any).image} 
+                                  alt={act.label} 
+                                  className="absolute inset-0 w-full h-full object-contain p-2 transition-all duration-700 group-hover:scale-105 saturate-[1.1]" 
+                                />
+                                <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
+                                <div className={`absolute bottom-5 right-5 w-12 h-12 rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 translate-y-4 group-hover:translate-y-0 transition-all duration-500 shadow-2xl
+                                  ${activeCategory === 'classroom' ? 'bg-blue-500 text-white' : 
+                                    activeCategory === 'study' ? 'bg-green-500 text-white' : 
+                                    activeCategory === 'play' ? 'bg-purple-500 text-white' : 
+                                    'bg-orange-500 text-white'}`}
+                                >
+                                  <ChevronRight className="w-7 h-7" />
+                                </div>
+                              </div>
+                              <div className="px-3">
+                                <h3 className={`font-outfit font-black text-2xl text-white transition-colors tracking-tight
+                                  ${activeCategory === 'classroom' ? 'group-hover:text-blue-400' : 
+                                    activeCategory === 'study' ? 'group-hover:text-green-400' : 
+                                    activeCategory === 'play' ? 'group-hover:text-purple-400' : 
+                                    'group-hover:text-orange-400'}`}
+                                >
+                                  {act.label}
+                                </h3>
+                                <p className="text-sm text-white/50 mt-2 leading-relaxed font-medium line-clamp-2">{act.desc}</p>
                               </div>
                             </div>
-                            <div className="px-3">
-                              <h3 className={`font-outfit font-black text-2xl text-white transition-colors tracking-tight
-                                ${activeCategory === 'learn' ? 'group-hover:text-blue-400' : 
-                                  activeCategory === 'study' ? 'group-hover:text-green-400' : 
-                                  activeCategory === 'play' ? 'group-hover:text-purple-400' : 
-                                  'group-hover:text-orange-400'}`}
-                              >
-                                {act.label}
-                              </h3>
-                              <p className="text-sm text-white/50 mt-2 leading-relaxed font-medium line-clamp-2">{act.desc}</p>
-                            </div>
-                          </div>
-                        ) : (
-                          <div className={`h-full rounded-[32px] border border-white/10 bg-white/[0.03] backdrop-blur-2xl p-6 flex flex-col transition-all duration-500 hover:border-white/20
-                            ${activeCategory === 'learn' ? 'hover:shadow-[0_0_40px_rgba(59,130,246,0.1)]' : 
-                              activeCategory === 'study' ? 'hover:shadow-[0_0_40px_rgba(34,197,94,0.1)]' : 
-                              activeCategory === 'play' ? 'hover:shadow-[0_0_40px_rgba(168,85,247,0.1)]' : 
-                              'hover:shadow-[0_0_40px_rgba(249,115,22,0.1)]'}`}
-                          >
-                            <div className="flex justify-between items-start mb-6">
-                              <div className={`w-14 h-14 rounded-[20px] flex items-center justify-center transition-all duration-500
-                                ${activeCategory === 'learn' ? 'bg-blue-500/20 text-blue-400' : 
-                                  activeCategory === 'study' ? 'bg-green-500/20 text-green-400' : 
-                                  activeCategory === 'play' ? 'bg-purple-500/20 text-purple-400' : 
-                                  'bg-orange-500/20 text-orange-400'}`}
-                              >
-                                <ActIcon className="w-7 h-7" />
+                          ) : (
+                            <div className={`h-full rounded-[32px] border border-white/10 bg-white/[0.03] backdrop-blur-2xl p-6 flex flex-col transition-all duration-500 hover:border-white/20
+                              ${activeCategory === 'classroom' ? 'hover:shadow-[0_0_40px_rgba(59,130,246,0.1)]' : 
+                                activeCategory === 'study' ? 'hover:shadow-[0_0_40px_rgba(34,197,94,0.1)]' : 
+                                activeCategory === 'play' ? 'hover:shadow-[0_0_40px_rgba(168,85,247,0.1)]' : 
+                                'hover:shadow-[0_0_40px_rgba(249,115,22,0.1)]'}`}
+                            >
+                              <div className="flex justify-between items-start mb-6">
+                                <div className={`w-14 h-14 rounded-[20px] flex items-center justify-center transition-all duration-500
+                                  ${activeCategory === 'classroom' ? 'bg-blue-500/20 text-blue-400' : 
+                                    activeCategory === 'study' ? 'bg-green-500/20 text-green-400' : 
+                                    activeCategory === 'play' ? 'bg-purple-500/20 text-purple-400' : 
+                                    'bg-orange-500/20 text-orange-400'}`}
+                                >
+                                  <ActIcon className="w-7 h-7" />
+                                </div>
+                              </div>
+                              <h3 className="font-black text-2xl text-white mb-3 tracking-tight">{act.label}</h3>
+                              <p className="text-sm text-white/50 flex-1 leading-relaxed font-medium">{act.desc}</p>
+                              
+                              <div className="flex items-center justify-between mt-8 pt-5 border-t border-white/5">
+                                <span className="text-sm font-black text-white/70 group-hover:text-white transition-colors tracking-wider uppercase">Launch Activity</span>
+                                <ChevronRight className={`w-5 h-5 transition-all
+                                  ${activeCategory === 'classroom' ? 'text-blue-400' : 
+                                    activeCategory === 'study' ? 'text-green-400' : 
+                                    activeCategory === 'play' ? 'text-purple-400' : 
+                                    'text-orange-400'}`} 
+                                />
                               </div>
                             </div>
-                            <h3 className="font-black text-2xl text-white mb-3 tracking-tight">{act.label}</h3>
-                            <p className="text-sm text-white/50 flex-1 leading-relaxed font-medium">{act.desc}</p>
-                            
-                            <div className="flex items-center justify-between mt-8 pt-5 border-t border-white/5">
-                              <span className="text-sm font-black text-white/70 group-hover:text-white transition-colors tracking-wider uppercase">Launch Activity</span>
-                              <ChevronRight className={`w-5 h-5 transition-all
-                                ${activeCategory === 'learn' ? 'text-blue-400' : 
-                                  activeCategory === 'study' ? 'text-green-400' : 
-                                  activeCategory === 'play' ? 'text-purple-400' : 
-                                  'text-orange-400'}`} 
-                              />
-                            </div>
-                          </div>
-                        )}
-                      </div>
-                    );
-                  })}
-                </div>
+                          )}
+                        </motion.div>
+                      );
+                    })}
+                  </motion.div>
+                </AnimatePresence>
               </div>
 
               {/* Footer */}

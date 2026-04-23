@@ -2,20 +2,23 @@
 
 import React, { useState, useEffect } from "react";
 import { Card, CardContent } from "@/components/ui/card";
-import { Scale, Clock, Gavel, Users, AlertCircle, CheckCircle2 } from "lucide-react";
+import { Scale, Clock, Gavel, Users, AlertCircle, CheckCircle2, Crown, UserPlus } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { useSocket } from "@/components/providers/SocketProvider";
+
+interface CourtroomRoles {
+  judge: string | null;
+  prosecution: string[];
+  defense: string[];
+}
 
 interface CourtroomState {
   caseTitle: string;
-  stage: 'setup' | 'arguments' | 'rebuttal' | 'voting' | 'verdict';
-  roles: {
-    judge: string | null;
-    prosecution: string | null;
-    defense: string | null;
-  };
+  stage: 'setup' | 'roles' | 'arguments' | 'rebuttal' | 'voting' | 'verdict';
+  assignedRoles: CourtroomRoles;
   activeSpeaker: 'prosecution' | 'defense' | 'judge' | null;
   timerEnd: number | null;
-  votes: { [participantId: string]: 'prosecution' | 'defense' };
+  votes: { [userName: string]: 'prosecution' | 'defense' };
 }
 
 export function CourtroomHost({ session, updateActivity }: { session: any; updateActivity: any }) {
@@ -23,7 +26,7 @@ export function CourtroomHost({ session, updateActivity }: { session: any; updat
   const state: CourtroomState = {
     caseTitle: session.activityData?.caseTitle ?? "",
     stage: session.activityData?.stage ?? 'setup',
-    roles: session.activityData?.roles ?? { judge: null, prosecution: null, defense: null },
+    assignedRoles: session.activityData?.assignedRoles ?? { judge: null, prosecution: [], defense: [] },
     activeSpeaker: session.activityData?.activeSpeaker ?? null,
     timerEnd: session.activityData?.timerEnd ?? null,
     votes: session.activityData?.votes ?? {}
@@ -31,6 +34,9 @@ export function CourtroomHost({ session, updateActivity }: { session: any; updat
 
   const [localTitle, setLocalTitle] = useState(state.caseTitle);
   const [timeLeft, setTimeLeft] = useState(0);
+
+  // Get socket from provider for atomic events
+  const { socket } = useSocket();
 
   useEffect(() => {
     if (!state.timerEnd) {
@@ -57,7 +63,33 @@ export function CourtroomHost({ session, updateActivity }: { session: any; updat
     updateActivity({ ...state, stage: newStage, activeSpeaker: null, timerEnd: null }, "live");
   };
 
-  const participants = session.participants?.filter((p: any) => p.role !== 'host') || [];
+  const participants = session.participants?.filter((p: any) => p.role !== 'host' && p.isConnected) || [];
+
+  const assignRole = (targetName: string, role: 'judge' | 'prosecution' | 'defense' | 'remove') => {
+    if (role === 'remove') {
+      // Remove from all roles by assigning 'remove' - server handles cleanup
+      // Actually we need to handle this client-side for now
+      const newRoles = { ...state.assignedRoles };
+      if (newRoles.judge === targetName) newRoles.judge = null;
+      newRoles.prosecution = (newRoles.prosecution || []).filter(n => n !== targetName);
+      newRoles.defense = (newRoles.defense || []).filter(n => n !== targetName);
+      updateActivity({ ...state, assignedRoles: newRoles }, "live");
+      return;
+    }
+    socket?.emit("courtroom:assign_role", { sessionId: session.id, targetName, role });
+  };
+
+  const getRole = (name: string): string | null => {
+    if (state.assignedRoles.judge === name) return 'judge';
+    if ((state.assignedRoles.prosecution || []).includes(name)) return 'prosecution';
+    if ((state.assignedRoles.defense || []).includes(name)) return 'defense';
+    return null;
+  };
+
+  const prosecutionMembers = participants.filter((p: any) => getRole(p.name) === 'prosecution');
+  const defenseMembers = participants.filter((p: any) => getRole(p.name) === 'defense');
+  const judgeName = state.assignedRoles.judge;
+  const juryMembers = participants.filter((p: any) => !getRole(p.name));
 
   if (isEditing) {
     return (
@@ -84,12 +116,95 @@ export function CourtroomHost({ session, updateActivity }: { session: any; updat
         <Button
           onClick={() => {
             if (!localTitle.trim()) return;
-            updateActivity({ ...state, caseTitle: localTitle, stage: 'arguments' }, "live");
+            updateActivity({ ...state, caseTitle: localTitle, stage: 'roles', assignedRoles: { judge: null, prosecution: [], defense: [] } }, "live");
           }}
           disabled={!localTitle.trim()}
           className="w-full max-w-sm bg-white text-black font-bold h-12 rounded-xl hover:bg-white/90"
         >
-          Begin Session
+          Next: Assign Roles
+        </Button>
+      </div>
+    );
+  }
+
+  // Role Assignment Phase
+  if (state.stage === 'roles') {
+    return (
+      <div className="flex flex-col items-center justify-center h-full w-full max-w-5xl mx-auto py-8 px-4">
+        <div className="text-center mb-8">
+          <h2 className="text-3xl font-bold text-white mb-2">Assign Court Roles</h2>
+          <p className="text-white/50 text-sm">Assign prosecution, defense, and optionally a judge. Unassigned become jury.</p>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 w-full mb-8">
+          {/* Judge */}
+          <div className="bg-[#0A0D14] border border-white/20 rounded-2xl p-5">
+            <div className="flex items-center gap-2 mb-4">
+              <Gavel className="w-4 h-4 text-white" />
+              <h3 className="text-sm font-bold text-white uppercase tracking-wider">Judge</h3>
+            </div>
+            {judgeName ? (
+              <div className="flex items-center justify-between bg-white/10 rounded-lg px-3 py-2">
+                <div className="flex items-center gap-2">
+                  <Crown className="w-3.5 h-3.5 text-yellow-400" />
+                  <span className="text-sm text-white font-medium">{judgeName}</span>
+                </div>
+                <button onClick={() => assignRole(judgeName, 'remove')} className="text-[10px] text-red-400 hover:text-red-300">Remove</button>
+              </div>
+            ) : (
+              <p className="text-xs text-white/30 text-center py-3">No judge assigned</p>
+            )}
+          </div>
+
+          {/* Prosecution */}
+          <div className="bg-[#0A0D14] border border-amber-500/30 rounded-2xl p-5">
+            <h3 className="text-sm font-bold text-amber-500 uppercase tracking-wider mb-4">Prosecution</h3>
+            <div className="space-y-2">
+              {prosecutionMembers.map((p: any) => (
+                <div key={p.name} className="flex items-center justify-between bg-amber-500/10 rounded-lg px-3 py-2">
+                  <span className="text-sm text-white font-medium">{p.name}</span>
+                  <button onClick={() => assignRole(p.name, 'remove')} className="text-[10px] text-red-400 hover:text-red-300">Remove</button>
+                </div>
+              ))}
+              {prosecutionMembers.length === 0 && <p className="text-xs text-white/30 text-center py-3">No members</p>}
+            </div>
+          </div>
+
+          {/* Defense */}
+          <div className="bg-[#0A0D14] border border-blue-500/30 rounded-2xl p-5">
+            <h3 className="text-sm font-bold text-blue-400 uppercase tracking-wider mb-4">Defense</h3>
+            <div className="space-y-2">
+              {defenseMembers.map((p: any) => (
+                <div key={p.name} className="flex items-center justify-between bg-blue-500/10 rounded-lg px-3 py-2">
+                  <span className="text-sm text-white font-medium">{p.name}</span>
+                  <button onClick={() => assignRole(p.name, 'remove')} className="text-[10px] text-red-400 hover:text-red-300">Remove</button>
+                </div>
+              ))}
+              {defenseMembers.length === 0 && <p className="text-xs text-white/30 text-center py-3">No members</p>}
+            </div>
+          </div>
+
+          {/* Unassigned / Jury */}
+          <div className="bg-[#0A0D14] border border-white/10 rounded-2xl p-5">
+            <h3 className="text-sm font-bold text-white/60 uppercase tracking-wider mb-4">Unassigned → Jury</h3>
+            <div className="space-y-2">
+              {juryMembers.map((p: any) => (
+                <div key={p.name} className="bg-white/5 rounded-lg px-3 py-2">
+                  <p className="text-sm text-white font-medium mb-2">{p.name}</p>
+                  <div className="flex gap-1 flex-wrap">
+                    <button onClick={() => assignRole(p.name, 'judge')} className="text-[9px] px-2 py-1 rounded bg-white/10 text-white hover:bg-white/20 font-bold">Judge</button>
+                    <button onClick={() => assignRole(p.name, 'prosecution')} className="text-[9px] px-2 py-1 rounded bg-amber-500/20 text-amber-400 hover:bg-amber-500/30 font-bold">Prosecution</button>
+                    <button onClick={() => assignRole(p.name, 'defense')} className="text-[9px] px-2 py-1 rounded bg-blue-500/20 text-blue-400 hover:bg-blue-500/30 font-bold">Defense</button>
+                  </div>
+                </div>
+              ))}
+              {juryMembers.length === 0 && <p className="text-xs text-white/30 text-center py-3">All assigned</p>}
+            </div>
+          </div>
+        </div>
+
+        <Button onClick={() => advanceStage('arguments')} className="bg-white text-black hover:bg-white/90 font-bold h-12 px-8 rounded-xl">
+          Begin Court Session →
         </Button>
       </div>
     );
@@ -120,7 +235,11 @@ export function CourtroomHost({ session, updateActivity }: { session: any; updat
       <div className="grid grid-cols-2 gap-8 w-full mb-10">
         <div className={`bg-[#0A0D14] border rounded-2xl p-6 text-center transition-all ${state.activeSpeaker === 'prosecution' ? 'border-amber-500 shadow-[0_0_30px_rgba(245,158,11,0.15)] scale-105' : 'border-white/10 opacity-70'}`}>
           <h3 className="font-bold text-sm text-amber-500/80 mb-2 uppercase tracking-widest">Prosecution</h3>
-          <p className="text-lg font-bold text-white mb-6">Arguing Against</p>
+          <div className="flex flex-wrap gap-1 justify-center mb-4">
+            {prosecutionMembers.map((p: any) => (
+              <span key={p.name} className="text-xs px-2 py-1 rounded-full bg-amber-500/10 text-amber-300">{p.name}</span>
+            ))}
+          </div>
           <div className="space-y-3">
             <Button size="sm" onClick={() => setSpeaker('prosecution', 120)} className="w-full bg-amber-500/10 text-amber-500 hover:bg-amber-500/20">Give Floor (2m)</Button>
           </div>
@@ -128,7 +247,11 @@ export function CourtroomHost({ session, updateActivity }: { session: any; updat
 
         <div className={`bg-[#0A0D14] border rounded-2xl p-6 text-center transition-all ${state.activeSpeaker === 'defense' ? 'border-blue-500 shadow-[0_0_30px_rgba(59,130,246,0.15)] scale-105' : 'border-white/10 opacity-70'}`}>
           <h3 className="font-bold text-sm text-blue-400/80 mb-2 uppercase tracking-widest">Defense</h3>
-          <p className="text-lg font-bold text-white mb-6">Arguing For</p>
+          <div className="flex flex-wrap gap-1 justify-center mb-4">
+            {defenseMembers.map((p: any) => (
+              <span key={p.name} className="text-xs px-2 py-1 rounded-full bg-blue-500/10 text-blue-300">{p.name}</span>
+            ))}
+          </div>
           <div className="space-y-3">
             <Button size="sm" onClick={() => setSpeaker('defense', 120)} className="w-full bg-blue-500/10 text-blue-400 hover:bg-blue-500/20">Give Floor (2m)</Button>
           </div>
@@ -174,7 +297,7 @@ export function CourtroomParticipant({ session, socket, userName }: { session: a
   const state: CourtroomState = {
     caseTitle: session.activityData?.caseTitle ?? "",
     stage: session.activityData?.stage ?? 'setup',
-    roles: session.activityData?.roles ?? { judge: null, prosecution: null, defense: null },
+    assignedRoles: session.activityData?.assignedRoles ?? { judge: null, prosecution: [], defense: [] },
     activeSpeaker: session.activityData?.activeSpeaker ?? null,
     timerEnd: session.activityData?.timerEnd ?? null,
     votes: session.activityData?.votes ?? {}
@@ -194,7 +317,7 @@ export function CourtroomParticipant({ session, socket, userName }: { session: a
     return () => clearInterval(interval);
   }, [state.timerEnd]);
 
-  if (isEditing || !state.stage) {
+  if (isEditing || !state.stage || state.stage === 'setup') {
     return (
       <div className="w-full h-full flex items-center justify-center text-center p-6">
         <div>
@@ -206,18 +329,72 @@ export function CourtroomParticipant({ session, socket, userName }: { session: a
     );
   }
 
-  const handleVote = (side: 'prosecution' | 'defense') => {
-    socket.emit("session:updateActivity", { sessionId: session.id, activityData: { ...state, votes: { ...state.votes, [socket.id]: side } } });
+  const getMyRole = (): string | null => {
+    if (state.assignedRoles.judge === userName) return 'judge';
+    if ((state.assignedRoles.prosecution || []).includes(userName)) return 'prosecution';
+    if ((state.assignedRoles.defense || []).includes(userName)) return 'defense';
+    return null;
   };
 
-  const hasVoted = state.votes && !!state.votes[socket.id];
-  const myVote = state.votes ? state.votes[socket.id] : null;
+  const myRole = getMyRole();
+  const isJury = !myRole;
+
+  // Role assignment phase
+  if (state.stage === 'roles') {
+    return (
+      <div className="w-full max-w-md mx-auto py-8 px-4 flex flex-col h-full text-center">
+        <Scale className="w-10 h-10 text-white/40 mx-auto mb-4" />
+        <h2 className="text-xl font-bold text-white mb-2">{state.caseTitle}</h2>
+        <p className="text-sm text-white/50 uppercase tracking-widest mb-8">Role Assignment</p>
+
+        <div className="bg-[#0A0D14] border border-white/10 rounded-2xl p-6 mb-4">
+          <p className="text-sm text-white/50 mb-2">Your Role</p>
+          <div className={`text-lg font-bold ${
+            myRole === 'judge' ? 'text-white' :
+            myRole === 'prosecution' ? 'text-amber-400' :
+            myRole === 'defense' ? 'text-blue-400' :
+            'text-white/40'
+          }`}>
+            {myRole === 'judge' ? 'Judge' :
+             myRole === 'prosecution' ? 'Prosecution' :
+             myRole === 'defense' ? 'Defense' :
+             'Jury Member (default)'}
+          </div>
+        </div>
+
+        <div className="flex justify-center mt-6">
+          <div className="flex items-center gap-2 bg-black/50 px-4 py-2 rounded-full border border-white/10">
+            <div className="w-2 h-2 rounded-full bg-yellow-500 animate-pulse" />
+            <span className="text-[10px] font-black text-white/60 uppercase tracking-widest">Waiting for host</span>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  const handleVote = (side: 'prosecution' | 'defense') => {
+    socket.emit("courtroom:vote", { sessionId: session.id, userName, side });
+  };
+
+  const hasVoted = state.votes && !!state.votes[userName];
+  const myVote = state.votes ? state.votes[userName] : null;
 
   return (
     <div className="w-full max-w-md mx-auto py-8 px-4 flex flex-col h-full">
       <div className="text-center mb-8">
         <h2 className="text-xl font-bold text-white mb-2">{state.caseTitle}</h2>
-        <span className="px-3 py-1 bg-white/10 rounded-full text-xs font-bold text-white/70 uppercase tracking-widest">{state.stage}</span>
+        <div className="flex items-center justify-center gap-3">
+          <span className="px-3 py-1 bg-white/10 rounded-full text-xs font-bold text-white/70 uppercase tracking-widest">{state.stage}</span>
+          {myRole && (
+            <span className={`px-3 py-1 rounded-full text-xs font-bold uppercase tracking-widest ${
+              myRole === 'judge' ? 'bg-white/20 text-white' :
+              myRole === 'prosecution' ? 'bg-amber-500/20 text-amber-400' :
+              'bg-blue-500/20 text-blue-400'
+            }`}>
+              {myRole}
+            </span>
+          )}
+        </div>
       </div>
 
       {state.timerEnd && (
@@ -232,20 +409,18 @@ export function CourtroomParticipant({ session, socket, userName }: { session: a
         </div>
       )}
 
-      {state.stage === 'voting' && (
+      {state.stage === 'voting' && isJury && (
         <div className="mt-auto bg-[#0A0D14] border border-white/10 rounded-2xl p-6">
           <h3 className="font-bold text-white text-center mb-6">Jury, cast your verdict:</h3>
           <div className="space-y-3">
             <Button 
               onClick={() => handleVote('prosecution')} 
-              disabled={hasVoted}
               className={`w-full h-14 rounded-xl font-bold text-lg ${myVote === 'prosecution' ? 'bg-amber-500 text-black' : 'bg-amber-500/10 text-amber-500 hover:bg-amber-500/20'} ${hasVoted && myVote !== 'prosecution' ? 'opacity-30' : ''}`}
             >
               Favor Prosecution
             </Button>
             <Button 
               onClick={() => handleVote('defense')} 
-              disabled={hasVoted}
               className={`w-full h-14 rounded-xl font-bold text-lg ${myVote === 'defense' ? 'bg-blue-500 text-black' : 'bg-blue-500/10 text-blue-400 hover:bg-blue-500/20'} ${hasVoted && myVote !== 'defense' ? 'opacity-30' : ''}`}
             >
               Favor Defense

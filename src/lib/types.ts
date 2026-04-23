@@ -20,7 +20,7 @@ export interface SessionState {
   id: string;
   hostId: string;
   hostName: string;
-  mode: "lobby" | "poll" | "quiz" | "qa" | "fitb" | "board" | "focus" | "tasks" | "trivia" | "wordchain" | "mostlikely" | "study" | "uno" | "ludo" | "thoughtmap" | "courtroom" | "duel" | "decision";
+  mode: "lobby" | "poll" | "quiz" | "qa" | "fitb" | "board" | "focus" | "tasks" | "trivia" | "wordchain" | "mostlikely" | "study" | "uno" | "ludo" | "thoughtmap" | "courtroom" | "duel" | "decision" | "antakshari" | "rmcs";
   status: "waiting" | "live" | "ended";
   activityData: Record<string, any>;
   participants: Participant[];

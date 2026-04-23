@@ -24,26 +24,34 @@ export function SessionControls({
   const [activePanel, setActivePanel] = useState<"chat" | "mod" | null>(null);
   const [message, setMessage] = useState("");
   const [voiceActive, setVoiceActive] = useState(false);
+  const [audioUnlocked, setAudioUnlocked] = useState(false);
   
   const { peers, isSpeaking } = useVoiceChannel(session?.id, socket, userName, voiceActive);
+
+  const me = session?.participants?.find((p: any) => p.name === userName);
+  const isMutedByHost = me?.mutedByHost;
+
+  // Sync voiceActive with session state
+  useEffect(() => {
+    if (!session) return;
+    if (me && me.micOn !== voiceActive) {
+      setVoiceActive(me.micOn);
+    }
+  }, [session?.participants, userName]);
 
   // Auto-join voice for games and study modes
   useEffect(() => {
     if (!session) return;
-    const gameModes = ["trivia", "wordchain", "mostlikely", "quiz", "study", "uno", "ludo"];
-    const me = session.participants?.find((p: any) => p.name === userName);
-    const isMutedByHost = me?.mutedByHost;
+    const gameModes = ["trivia", "wordchain", "mostlikely", "quiz", "study", "uno", "ludo", "antakshari"];
 
+    // If we are in a game mode and just got unmuted (or just joined), auto-enable mic
     if (gameModes.includes(session.mode) && !voiceActive && !isMutedByHost) {
       setVoiceActive(true);
       socket.emit("voice:toggle", { sessionId: session.id, userName, micOn: true });
     }
-  }, [session?.mode]);
+  }, [session?.mode, isMutedByHost]);
 
   if (!session) return null;
-
-  const me = session.participants?.find((p: any) => p.name === userName);
-  const isMutedByHost = me?.mutedByHost;
 
   const toggleVoice = () => {
     if (isMutedByHost) {
@@ -71,6 +79,12 @@ export function SessionControls({
     }
   };
 
+  const promoteToHost = (targetId: string, targetName: string) => {
+    if (confirm(`Transfer host role to ${targetName}? You will become a participant.`)) {
+      socket.emit("session:promote", { sessionId: session.id, targetUserId: targetId });
+    }
+  };
+
   const toggleMute = (targetName: string, isMuted: boolean) => {
     socket.emit("mod:mute", { sessionId: session.id, targetName, isMuted: !isMuted });
   };
@@ -87,32 +101,32 @@ export function SessionControls({
         dragMomentum={false}
         dragElastic={0}
         whileDrag={{ scale: 1.02, cursor: "grabbing" }}
-        className="fixed bottom-4 md:bottom-10 left-1/2 -translate-x-1/2 z-[100] flex items-center gap-1.5 md:gap-2 bg-white/10 backdrop-blur-[24px] border border-white/20 px-3 py-3 md:px-5 md:py-4 rounded-full shadow-[0_20px_50px_rgba(0,0,0,0.4)] cursor-grab touch-none select-none pointer-events-auto"
+        className="fixed bottom-6 md:bottom-12 left-1/2 -translate-x-1/2 z-[100] flex items-center gap-2 md:gap-3 bg-white/[0.08] backdrop-blur-[32px] border border-white/10 px-4 py-3 md:px-6 md:py-4 rounded-[2.5rem] shadow-[0_32px_64px_-12px_rgba(0,0,0,0.6)] cursor-grab touch-none select-none pointer-events-auto ring-1 ring-white/10"
       >
         <div className="relative group">
-          <div className="absolute inset-0 bg-primary/20 rounded-full blur-md opacity-0 group-hover:opacity-100 transition-opacity" />
+          <div className="absolute inset-0 bg-primary/20 rounded-full blur-xl opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
           <Button 
             variant="ghost" 
             size="icon" 
             onClick={onBack} 
             title="Go Back" 
-            className="text-white hover:bg-white/10 rounded-full w-10 h-10 md:w-12 md:h-12 relative border-2 border-primary shadow-[0_0_15px_rgba(0,212,255,0.3)]"
+            className="text-white hover:bg-white/10 rounded-full w-10 h-10 md:w-14 md:h-14 relative border border-primary/40 shadow-[0_0_20px_rgba(0,212,255,0.2)] hover:border-primary transition-all duration-300"
           >
             <ArrowLeft className="w-5 h-5 md:w-6 md:h-6" />
           </Button>
         </div>
 
-        <div className="w-px h-6 md:h-8 bg-white/10 mx-1 md:mx-2" />
+        <div className="w-px h-8 md:h-10 bg-white/10 mx-1 md:mx-2" />
         
-        <div className="flex items-center gap-1">
+        <div className="flex items-center gap-2">
           <Button 
             variant={voiceActive ? "default" : "ghost"} 
             size="icon" 
             onClick={toggleVoice} 
             title={isMutedByHost ? "Muted by Host" : "Toggle Voice"}
-            className={`rounded-full w-10 h-10 md:w-12 md:h-12 ${voiceActive ? "bg-green-500 hover:bg-green-600 text-white shadow-[0_0_20px_rgba(34,197,94,0.3)]" : "text-white/60 hover:text-white hover:bg-white/10"} ${isMutedByHost ? "opacity-50 cursor-not-allowed text-red-400" : ""}`}
+            className={`rounded-full w-10 h-10 md:w-14 md:h-14 transition-all duration-300 border border-transparent ${voiceActive ? "bg-green-500/20 border-green-500/50 text-green-400 shadow-[0_0_30px_rgba(34,197,94,0.2)] hover:bg-green-500/30" : "text-white/40 hover:text-white hover:bg-white/10"} ${isMutedByHost ? "opacity-50 cursor-not-allowed text-red-400" : ""}`}
           >
-            {voiceActive ? <Mic className="w-4 h-4 md:w-5 md:h-5" /> : <MicOff className="w-4 h-4 md:w-5 md:h-5" />}
+            {voiceActive ? <Mic className="w-5 h-5 md:w-6 md:h-6" /> : <MicOff className="w-5 h-5 md:w-6 md:h-6" />}
           </Button>
 
           <Button 
@@ -120,9 +134,9 @@ export function SessionControls({
             size="icon" 
             onClick={() => togglePanel("chat")} 
             title="Community Chat"
-            className={`rounded-full w-10 h-10 md:w-12 md:h-12 ${activePanel === "chat" ? "bg-primary hover:bg-primary/90 text-white shadow-[0_0_20px_rgba(0,212,255,0.3)]" : "text-white/60 hover:text-white hover:bg-white/10"}`}
+            className={`rounded-full w-10 h-10 md:w-14 md:h-14 transition-all duration-300 border border-transparent ${activePanel === "chat" ? "bg-primary/20 border-primary/50 text-primary shadow-[0_0_30px_rgba(0,212,255,0.2)] hover:bg-primary/30" : "text-white/40 hover:text-white hover:bg-white/10"}`}
           >
-            <MessageSquare className="w-4 h-4 md:w-5 md:h-5" />
+            <MessageSquare className="w-5 h-5 md:w-6 md:h-6" />
           </Button>
 
           {isHost && (
@@ -131,16 +145,22 @@ export function SessionControls({
               size="icon" 
               onClick={() => togglePanel("mod")} 
               title="Moderation Controls"
-              className={`rounded-full w-10 h-10 md:w-12 md:h-12 ${activePanel === "mod" ? "bg-violet-500 hover:bg-violet-600 text-white shadow-[0_0_20px_rgba(139,92,246,0.3)]" : "text-white/60 hover:text-white hover:bg-white/10"}`}
+              className={`rounded-full w-10 h-10 md:w-14 md:h-14 transition-all duration-300 border border-transparent ${activePanel === "mod" ? "bg-violet-500/20 border-violet-500/50 text-violet-400 shadow-[0_0_30px_rgba(139,92,246,0.2)] hover:bg-violet-500/30" : "text-white/40 hover:text-white hover:bg-white/10"}`}
             >
-              <Shield className="w-4 h-4 md:w-5 md:h-5" />
+              <Shield className="w-5 h-5 md:w-6 md:h-6" />
             </Button>
           )}
         </div>
 
-        <div className="w-px h-6 md:h-8 bg-white/10 mx-1 md:mx-2" />
-        
-        <Button variant="ghost" size="icon" onClick={onLeave} title="Leave Session" className="text-red-400/60 hover:text-red-400 hover:bg-red-400/10 rounded-full w-10 h-10 md:w-12 md:h-12">
+        <div className="w-px h-8 md:h-10 bg-white/10 mx-1 md:mx-2" />
+
+        <Button 
+          variant="ghost" 
+          size="icon" 
+          onClick={onLeave} 
+          title="Exit Session"
+          className="rounded-full w-10 h-10 md:w-14 md:h-14 text-white/40 hover:text-red-400 hover:bg-red-500/10 transition-all duration-300 border border-transparent hover:border-red-500/30"
+        >
           <LogOut className="w-5 h-5 md:w-6 md:h-6" />
         </Button>
       </motion.div>
@@ -224,7 +244,35 @@ export function SessionControls({
             </div>
             
             <div className="flex-1 overflow-y-auto p-4 space-y-2">
-              <p className="text-xs font-bold text-muted-foreground uppercase tracking-widest mb-4">Participants ({session.participants.length - 1})</p>
+              <div className="flex items-center justify-between mb-4">
+                <p className="text-xs font-bold text-muted-foreground uppercase tracking-widest">Participants ({session.participants.length - 1})</p>
+                {session.participants.length > 1 && (
+                  <div className="flex gap-2">
+                    <Button 
+                      variant="ghost" 
+                      size="sm" 
+                      onClick={() => {
+                        if (confirm("Mute all participants?")) {
+                          socket.emit("mod:mute_all", { sessionId: session.id });
+                        }
+                      }}
+                      className="h-7 text-[9px] font-black uppercase tracking-widest text-red-400 border border-red-400/20 hover:bg-red-400/10"
+                    >
+                      Mute All
+                    </Button>
+                    <Button 
+                      variant="ghost" 
+                      size="sm" 
+                      onClick={() => {
+                        socket.emit("mod:unmute_all", { sessionId: session.id });
+                      }}
+                      className="h-7 text-[9px] font-black uppercase tracking-widest text-emerald-400 border border-emerald-400/20 hover:bg-emerald-400/10"
+                    >
+                      Unmute All
+                    </Button>
+                  </div>
+                )}
+              </div>
               
               {session.participants.filter((p: any) => p.role !== 'host').map((p: any) => {
                 const isPlayer = session.players?.includes(p.name);
@@ -249,6 +297,15 @@ export function SessionControls({
                           className={`h-7 px-2 text-[9px] font-black uppercase tracking-widest border ${isPlayer ? 'text-amber-400 border-amber-400/20 hover:bg-amber-400/10' : 'text-emerald-400 border-emerald-400/20 hover:bg-emerald-400/10'}`}
                         >
                           {isPlayer ? "Demote" : "Promote"}
+                        </Button>
+                        <Button 
+                          variant="ghost" 
+                          size="sm" 
+                          onClick={() => promoteToHost(p.id, p.name)}
+                          className="h-7 px-2 text-[9px] font-black uppercase tracking-widest border border-violet-500/20 text-violet-400 hover:bg-violet-500/10"
+                          title="Transfer Host Role"
+                        >
+                          Make Host
                         </Button>
                       </div>
                     </div>
@@ -296,11 +353,45 @@ export function SessionControls({
         {Object.entries(peers).map(([id, { stream }]) => (
           <audio 
             key={id} 
-            autoPlay 
-            ref={el => { if (el) el.srcObject = stream; }} 
+            autoPlay
+            playsInline
+            ref={el => { 
+              if (el) { 
+                el.srcObject = stream; 
+                el.volume = 1.0;
+                // Only trigger overlay if playback fails AND we haven't unlocked yet
+                el.play().catch(() => {
+                  // Only show if we haven't unlocked and it's not already showing
+                  if (audioUnlocked === true) return; 
+                  setAudioUnlocked(false);
+                });
+              } 
+            }} 
           />
         ))}
       </div>
+
+      {/* Mobile Audio Unlock Overlay */}
+      {!audioUnlocked && Object.keys(peers).length > 0 && (
+        <div 
+          className="fixed inset-0 z-[200] bg-black/70 backdrop-blur-sm flex items-center justify-center"
+          onClick={(e) => {
+            e.stopPropagation();
+            setAudioUnlocked(true);
+            // Force play all audio elements on the page after user gesture
+            const audios = document.querySelectorAll('audio');
+            audios.forEach(a => {
+              a.play().catch(err => console.log("Post-unlock play failed:", err));
+            });
+          }}
+        >
+          <div className="bg-[#0A0D14] border border-white/20 rounded-2xl p-8 text-center max-w-sm mx-4">
+            <Volume2 className="w-12 h-12 text-primary mx-auto mb-4 animate-pulse" />
+            <h3 className="text-xl font-bold text-white mb-2">Tap to Enable Audio</h3>
+            <p className="text-white/50 text-sm">Your browser requires a tap to play voice audio from other participants</p>
+          </div>
+        </div>
+      )}
     </>
   );
 }
