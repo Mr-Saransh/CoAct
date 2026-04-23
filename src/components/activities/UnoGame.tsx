@@ -158,7 +158,7 @@ export function UnoHost({ session, socket }: { session: SessionLike; socket: Soc
                 <h4 className="text-[10px] font-black text-white/40 uppercase tracking-[0.2em]">Participants</h4>
                 <div className="text-[10px] font-black text-primary uppercase">{players.length}/10</div>
               </div>
-              <div className="space-y-2 max-h-48 overflow-y-auto pr-2 custom-scrollbar">
+              <div className="space-y-2 max-h-[40vh] overflow-y-auto pr-2 custom-scrollbar">
                 {(session?.participants || []).map((p, i) => {
                   const isPlayer = session.players.includes(p.name);
                   return (
