@@ -71,17 +71,19 @@ function canPlayCard(card: UnoCard, currentCard: UnoCard | null, currentColor: s
   return false;
 }
 
-function getSeatPosition(index: number, total: number) {
+function getSeatPosition(index: number, total: number, isMobile: boolean) {
   const angle = (index / total) * Math.PI * 2;
+  const radiusX = isMobile ? 36 : 42;
+  const radiusY = isMobile ? 32 : 38;
   return {
-    x: Math.cos(angle - Math.PI / 2) * 42,
-    y: Math.sin(angle - Math.PI / 2) * 38
+    x: Math.cos(angle - Math.PI / 2) * radiusX,
+    y: Math.sin(angle - Math.PI / 2) * radiusY
   };
 }
 
 function RoleBadge({ role }: { role: "player" | "spectator" }) {
   return (
-    <div className={`px-2.5 py-1 rounded-full text-[9px] font-black uppercase tracking-widest border ${role === 'player' ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-400' : 'bg-amber-500/10 border-amber-500/30 text-amber-400'}`}>
+    <div className={`px-2 py-0.5 rounded-full text-[8px] font-black uppercase tracking-widest border ${role === 'player' ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-400' : 'bg-amber-500/10 border-amber-500/30 text-amber-400'}`}>
       {role}
     </div>
   );
@@ -94,7 +96,7 @@ function FloatingReactions({ sessionId, socket }: { sessionId: string; socket: S
     const handler = (reaction: { id: string; emoji: string }) => {
       const newReaction = {
         ...reaction,
-        x: 15 + Math.random() * 70,
+        x: 10 + Math.random() * 80,
         y: 80 + Math.random() * 10,
       };
       setReactions((prev) => [...prev, newReaction]);
@@ -142,41 +144,41 @@ export function UnoHost({ session, socket }: { session: SessionLike; socket: Soc
 
   if (gameStatus !== "live") {
     return (
-      <div className="w-full max-w-2xl mx-auto p-4 md:p-8 animate-in fade-in slide-in-from-bottom-4 duration-700">
+      <div className="w-full max-w-2xl mx-auto p-4 animate-in fade-in slide-in-from-bottom-4 duration-700">
         <Card className="border-white/10 bg-[#0A0F1D]/80 backdrop-blur-2xl shadow-3xl overflow-hidden">
           <div className="h-2 bg-gradient-to-r from-red-500 via-blue-500 via-green-500 to-yellow-500" />
           <CardHeader className="pb-2">
-            <CardTitle className="text-3xl font-black font-outfit text-white tracking-tight">UNO BATTLE</CardTitle>
-            <p className="text-xs text-white/40 uppercase font-bold tracking-widest">Configure your session</p>
+            <CardTitle className="text-2xl md:text-3xl font-black font-outfit text-white tracking-tight">UNO BATTLE</CardTitle>
+            <p className="text-[10px] text-white/40 uppercase font-bold tracking-widest">Configuration</p>
           </CardHeader>
-          <CardContent className="space-y-8 p-8">
+          <CardContent className="space-y-6 p-6">
             <div className="space-y-4">
-              <div className="flex items-center justify-between px-2">
+              <div className="flex items-center justify-between px-1">
                 <h4 className="text-[10px] font-black text-white/40 uppercase tracking-[0.2em]">Participants</h4>
-                <div className="text-[10px] font-black text-primary uppercase">Slots: {players.length}/10</div>
+                <div className="text-[10px] font-black text-primary uppercase">{players.length}/10</div>
               </div>
-              <div className="space-y-3 max-h-72 overflow-y-auto pr-3 custom-scrollbar">
+              <div className="space-y-2 max-h-48 overflow-y-auto pr-2 custom-scrollbar">
                 {(session?.participants || []).map((p, i) => {
                   const isPlayer = session.players.includes(p.name);
                   return (
-                    <div key={i} className="flex items-center gap-4 p-4 rounded-2xl bg-white/5 border border-white/5 group hover:bg-white/10 transition-all">
-                      <div className="w-10 h-10 rounded-xl bg-primary/20 flex items-center justify-center shadow-lg">
-                        <Sparkles className="w-5 h-5 text-primary" />
+                    <div key={i} className="flex items-center gap-3 p-3 rounded-xl bg-white/5 border border-white/5 hover:bg-white/10 transition-all">
+                      <div className="w-8 h-8 rounded-lg bg-primary/20 flex items-center justify-center">
+                        <Sparkles className="w-4 h-4 text-primary" />
                       </div>
                       <div className="flex flex-col">
-                        <span className="text-sm font-bold text-white">{p.name} {p.name === session.hostName && "👑"}</span>
+                        <span className="text-xs font-bold text-white truncate max-w-[80px]">{p.name}</span>
                         <RoleBadge role={isPlayer ? "player" : "spectator"} />
                       </div>
-                      <div className="ml-auto flex items-center gap-3">
+                      <div className="ml-auto flex items-center gap-2">
                         <Button 
                           size="sm" 
                           variant="ghost" 
-                          className={`h-9 text-[10px] uppercase font-black px-4 rounded-lg transition-all ${isPlayer ? 'text-amber-400 hover:bg-amber-400/10' : 'text-emerald-400 hover:bg-emerald-400/10'}`}
+                          className={`h-8 text-[9px] uppercase font-black px-3 rounded-lg ${isPlayer ? 'text-amber-400' : 'text-emerald-400'}`}
                           onClick={() => socket.emit("session:toggle_role", { sessionId: session.id, targetName: p.name })}
                         >
-                          {isPlayer ? "Spectate" : "Play"}
+                          {isPlayer ? "Spec" : "Play"}
                         </Button>
-                        <div className={`w-2.5 h-2.5 rounded-full ${p.isConnected ? "bg-emerald-500 shadow-[0_0_10px_rgba(16,185,129,0.5)]" : "bg-red-500"}`} />
+                        <div className={`w-2 h-2 rounded-full ${p.isConnected ? "bg-emerald-500" : "bg-red-500"}`} />
                       </div>
                     </div>
                   );
@@ -185,34 +187,23 @@ export function UnoHost({ session, socket }: { session: SessionLike; socket: Soc
             </div>
 
             <div className="space-y-4">
-              <p className="text-[10px] font-black text-white/40 uppercase tracking-[0.2em] px-2">Game Rules</p>
-              <div className="grid grid-cols-2 gap-4">
-                <button
-                  onClick={() => setCardsPerPlayer(7)}
-                  className={`h-20 rounded-2xl border-2 flex flex-col items-center justify-center transition-all ${cardsPerPlayer === 7 ? "bg-primary border-primary text-black shadow-lg shadow-primary/20" : "bg-white/5 border-white/10 text-white/40 hover:border-white/20"}`}
-                >
-                  <span className="text-xl font-black">7</span>
-                  <span className="text-[10px] font-bold uppercase tracking-widest">Cards</span>
+              <p className="text-[10px] font-black text-white/40 uppercase tracking-[0.2em] px-1">Rules</p>
+              <div className="grid grid-cols-2 gap-3">
+                <button onClick={() => setCardsPerPlayer(7)} className={`h-16 rounded-xl border-2 flex flex-col items-center justify-center transition-all ${cardsPerPlayer === 7 ? "bg-primary border-primary text-black" : "bg-white/5 border-white/10 text-white/40"}`}>
+                  <span className="text-lg font-black">7</span>
+                  <span className="text-[8px] font-bold uppercase tracking-widest">Cards</span>
                 </button>
-                <button
-                  onClick={() => setCardsPerPlayer(9)}
-                  className={`h-20 rounded-2xl border-2 flex flex-col items-center justify-center transition-all ${cardsPerPlayer === 9 ? "bg-primary border-primary text-black shadow-lg shadow-primary/20" : "bg-white/5 border-white/10 text-white/40 hover:border-white/20"}`}
-                >
-                  <span className="text-xl font-black">9</span>
-                  <span className="text-[10px] font-bold uppercase tracking-widest">Cards</span>
+                <button onClick={() => setCardsPerPlayer(9)} className={`h-16 rounded-xl border-2 flex flex-col items-center justify-center transition-all ${cardsPerPlayer === 9 ? "bg-primary border-primary text-black" : "bg-white/5 border-white/10 text-white/40"}`}>
+                  <span className="text-lg font-black">9</span>
+                  <span className="text-[8px] font-bold uppercase tracking-widest">Cards</span>
                 </button>
               </div>
             </div>
 
-            <div className="pt-4">
-              <Button 
-                onClick={startGame} 
-                disabled={!canStart} 
-                className="w-full h-16 bg-white text-black text-lg font-black uppercase tracking-widest hover:bg-primary transition-all rounded-2xl shadow-xl shadow-black/20"
-              >
-                Launch Game
+            <div className="pt-2">
+              <Button onClick={startGame} disabled={!canStart} className="w-full h-14 bg-white text-black text-base font-black uppercase tracking-widest rounded-xl">
+                Launch
               </Button>
-              {!canStart && <p className="text-[10px] text-amber-400/80 text-center font-black uppercase tracking-widest mt-4">Need 2-10 players to start</p>}
             </div>
           </CardContent>
         </Card>
@@ -227,12 +218,12 @@ export function UnoParticipant({ session, socket, userName }: { session: Session
   const unoState = (session?.activityData || {}) as Partial<UnoState>;
   if ((unoState.status || "setup") !== "live") {
     return (
-      <div className="w-full max-w-md mx-auto text-center py-20 animate-in fade-in zoom-in duration-1000">
-        <div className="w-24 h-24 bg-gradient-to-br from-red-500 via-blue-500 to-green-500 rounded-[2.5rem] flex items-center justify-center mx-auto mb-10 shadow-3xl border-4 border-white/20">
-          <Sparkles className="w-12 h-12 text-white animate-pulse" />
+      <div className="w-full max-w-md mx-auto text-center py-12 animate-in fade-in zoom-in duration-1000">
+        <div className="w-20 h-20 bg-gradient-to-br from-red-500 via-blue-500 to-green-500 rounded-[2rem] flex items-center justify-center mx-auto mb-8 shadow-3xl">
+          <Sparkles className="w-10 h-10 text-white animate-pulse" />
         </div>
-        <h2 className="text-4xl font-black font-outfit text-white tracking-tight mb-4 italic">WAITING FOR HOST</h2>
-        <p className="text-white/40 font-medium tracking-wide uppercase text-xs">Preparing the deck for battle...</p>
+        <h2 className="text-3xl font-black font-outfit text-white tracking-tight mb-2 italic uppercase">Waiting for Host</h2>
+        <p className="text-white/40 font-bold uppercase tracking-widest text-[10px]">Preparing for battle...</p>
       </div>
     );
   }
@@ -263,6 +254,14 @@ function UnoBoard({ session, socket, userName }: { session: SessionLike; socket:
   const secondsLeft = Math.max(0, Math.ceil(((state.turnEndsAt || 0) - nowTs) / 1000));
   const currentColorMeta = COLOR_META[(state.currentColor || "red") as UnoCard["color"]];
 
+  const [isMobile, setIsMobile] = useState(false);
+  useEffect(() => {
+    const check = () => setIsMobile(window.innerWidth < 768);
+    check();
+    window.addEventListener('resize', check);
+    return () => window.removeEventListener('resize', check);
+  }, []);
+
   const playCard = (card: UnoCard, chosenColor?: "red" | "blue" | "green" | "yellow") => {
     if (!isMyTurn || isSpectator) return;
     if (!playableSet.has(card.id)) return;
@@ -289,70 +288,33 @@ function UnoBoard({ session, socket, userName }: { session: SessionLike; socket:
   const others = (state.order || []).filter((n) => n !== me);
   const isSpectator = session.spectators.includes(me);
 
-  const sendReaction = (emoji: string) => {
-    socket.emit("session:reaction", { sessionId: session.id, userName: me, emoji });
-  };
-
   return (
-    <div className="w-full max-w-6xl mx-auto p-4 md:p-10 pb-32 relative font-outfit select-none h-full flex flex-col">
+    <div className="w-full max-w-6xl mx-auto p-2 md:p-10 pb-40 relative font-outfit select-none flex flex-col h-full overflow-hidden">
       <FloatingReactions sessionId={session.id} socket={socket} />
       
-      {isSpectator && (
-        <div className="fixed top-6 right-6 z-[80]">
-           <div className="flex items-center gap-3 px-6 py-3 rounded-2xl bg-amber-500/90 backdrop-blur-xl border border-white/20 shadow-3xl">
-              <div className="w-2.5 h-2.5 rounded-full bg-white animate-pulse" />
-              <span className="text-xs font-black uppercase tracking-[0.2em] text-white">Spectating Live</span>
-           </div>
-        </div>
-      )}
-
-      {/* Action Bar */}
-      <div className="flex items-center justify-between mb-8 px-4">
-        <div className="flex items-center gap-4">
-          <div className={`p-4 rounded-2xl bg-black/40 border border-white/10 backdrop-blur-xl shadow-2xl transition-all ${isMyTurn ? "border-primary/50 ring-2 ring-primary/20" : ""}`}>
-            <p className="text-[10px] font-black text-white/30 uppercase tracking-[0.2em] mb-1">Current Turn</p>
-            <div className="flex items-center gap-3">
-              <span className="text-sm font-black text-white truncate max-w-[120px]">{state.turn}</span>
-              {isMyTurn && <div className="px-2 py-0.5 rounded-md bg-primary text-black text-[9px] font-black">YOU</div>}
-            </div>
+      {/* Header Info */}
+      <div className="flex items-center justify-between mb-4 md:mb-8 px-4 relative z-50">
+        <div className="flex items-center gap-2 md:gap-4">
+          <div className={`px-4 py-2 rounded-xl bg-black/40 border border-white/10 backdrop-blur-xl shadow-2xl transition-all ${isMyTurn ? "border-primary/50 ring-1 ring-primary/20" : ""}`}>
+            <p className="text-[8px] font-black text-white/30 uppercase tracking-[0.2em]">Turn</p>
+            <span className="text-[10px] md:text-sm font-black text-white truncate max-w-[80px] md:max-w-[120px] block">{state.turn}</span>
           </div>
-          <div className="p-4 rounded-2xl bg-black/40 border border-white/10 backdrop-blur-xl shadow-2xl">
-            <p className="text-[10px] font-black text-white/30 uppercase tracking-[0.2em] mb-1">Time Remaining</p>
-            <span className={`text-sm font-black ${secondsLeft < 10 ? "text-red-400 animate-pulse" : "text-white"}`}>{secondsLeft}s</span>
+          <div className="px-4 py-2 rounded-xl bg-black/40 border border-white/10 backdrop-blur-xl shadow-2xl">
+            <p className="text-[8px] font-black text-white/30 uppercase tracking-[0.2em]">Time</p>
+            <span className={`text-[10px] md:text-sm font-black ${secondsLeft < 10 ? "text-red-400 animate-pulse" : "text-white"}`}>{secondsLeft}s</span>
           </div>
         </div>
-
-        <div className="flex items-center gap-4">
-          <div className="p-4 rounded-2xl bg-black/40 border border-white/10 backdrop-blur-xl shadow-2xl flex flex-col items-center">
-            <p className="text-[10px] font-black text-white/30 uppercase tracking-[0.2em] mb-1">Direction</p>
-            <motion.div
-              animate={state.direction === "clockwise" ? { rotate: 0 } : { rotate: 180 }}
-              transition={{ type: "spring", stiffness: 200, damping: 20 }}
-              className="text-primary"
-            >
-              <RefreshCcw className="w-5 h-5" />
-            </motion.div>
-          </div>
-          <div className="p-4 rounded-2xl bg-black/40 border border-white/10 backdrop-blur-xl shadow-2xl flex flex-col items-center">
-            <p className="text-[10px] font-black text-white/30 uppercase tracking-[0.2em] mb-1">Color</p>
-            <div className={`w-5 h-5 rounded-full shadow-lg ${currentColorMeta.bg.split(' ')[1]}`} />
-          </div>
-        </div>
+        <div className={`w-8 h-8 rounded-full shadow-lg border-2 border-white/20 ${currentColorMeta.bg.split(' ')[1]}`} />
       </div>
 
-      <div className="flex-1 relative min-h-[400px] rounded-[3rem] border border-white/10 bg-[#0A0D14]/60 backdrop-blur-3xl shadow-[0_48px_120px_rgba(0,0,0,0.6)] overflow-hidden">
-        <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,rgba(255,255,255,0.03)_0%,transparent_70%)] pointer-events-none" />
+      <div className="flex-1 relative min-h-[300px] md:min-h-[400px] rounded-[2.5rem] border border-white/5 bg-[#0A0D14]/40 backdrop-blur-3xl shadow-3xl overflow-hidden">
+        <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,rgba(255,255,255,0.02)_0%,transparent_70%)] pointer-events-none" />
         
-        {/* Arena Grid */}
-        <div className="absolute inset-0 pointer-events-none opacity-20" style={{ backgroundImage: 'radial-gradient(rgba(255,255,255,0.1) 1px, transparent 1px)', backgroundSize: '40px 40px' }} />
-
         {/* Center Deck Area */}
-        <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 flex items-center gap-12 z-30 scale-110">
-          {/* Discard Pile */}
-          <div className="flex flex-col items-center gap-4">
-            <p className="text-[10px] font-black text-white/20 uppercase tracking-[0.3em]">Discard</p>
-            <div className="relative group">
-              <div className={`absolute -inset-10 rounded-full blur-[80px] opacity-20 transition-all duration-1000 ${currentColorMeta.glow.replace('shadow', 'bg')}`} />
+        <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 flex items-center gap-4 md:gap-12 z-10 scale-[0.8] md:scale-110">
+          <div className="flex flex-col items-center gap-2">
+            <p className="text-[8px] font-black text-white/20 uppercase tracking-[0.3em]">Discard</p>
+            <div className="relative">
               <AnimatePresence mode="wait">
                 {state.currentCard && (
                   <motion.div
@@ -360,7 +322,6 @@ function UnoBoard({ session, socket, userName }: { session: SessionLike; socket:
                     initial={{ opacity: 0, x: 100, y: -50, rotate: 25, scale: 0.5 }}
                     animate={{ opacity: 1, x: 0, y: 0, rotate: (state.lastEvent?.timestamp || 0) % 15 - 7, scale: 1 }}
                     exit={{ opacity: 0, scale: 0.8, x: -20 }}
-                    transition={{ type: "spring", stiffness: 200, damping: 20 }}
                   >
                     <UnoCardFace card={state.currentCard} playable={false} compact />
                   </motion.div>
@@ -369,28 +330,17 @@ function UnoBoard({ session, socket, userName }: { session: SessionLike; socket:
             </div>
           </div>
 
-          {/* Draw Deck */}
-          <div className="flex flex-col items-center gap-4">
-            <p className="text-[10px] font-black text-white/20 uppercase tracking-[0.3em]">Draw</p>
+          <div className="flex flex-col items-center gap-2">
+            <p className="text-[8px] font-black text-white/20 uppercase tracking-[0.3em]">Draw</p>
             <motion.button
               onPointerDown={drawCard}
-              whileHover={isMyTurn && !state.hasDrawnThisTurn ? { scale: 1.05, y: -5 } : {}}
-              whileTap={isMyTurn && !state.hasDrawnThisTurn ? { scale: 0.95 } : {}}
               disabled={!isMyTurn || state.hasDrawnThisTurn}
-              className={`relative rounded-2xl w-24 h-34 border-2 border-white/10 bg-[#1A1F2B] overflow-hidden shadow-2xl transition-all ${isMyTurn && !state.hasDrawnThisTurn ? "cursor-pointer ring-4 ring-primary/40 border-primary/50" : "grayscale opacity-40 cursor-not-allowed"}`}
+              className={`relative rounded-xl w-22 h-32 md:w-24 md:h-34 border-2 border-white/10 bg-[#1A1F2B] overflow-hidden shadow-2xl transition-all ${isMyTurn && !state.hasDrawnThisTurn ? "cursor-pointer ring-2 ring-primary/40 border-primary/50" : "grayscale opacity-40"}`}
             >
               <div className="absolute inset-0 bg-gradient-to-br from-primary/10 to-transparent" />
-              <div className="absolute inset-4 rounded-xl border border-white/5 flex items-center justify-center">
-                <Sparkles className="w-8 h-8 text-primary/30" />
-              </div>
               <div className="absolute inset-0 flex items-center justify-center">
-                <span className="text-lg font-black text-white/10 tracking-tighter italic">COACT</span>
+                <span className="text-[10px] font-black text-white/10 tracking-tighter italic">COACT</span>
               </div>
-              {isMyTurn && !state.hasDrawnThisTurn && (
-                <div className="absolute bottom-2 left-0 w-full flex justify-center">
-                  <div className="px-2 py-0.5 rounded-md bg-primary text-black text-[8px] font-black animate-bounce">TAP TO DRAW</div>
-                </div>
-              )}
             </motion.button>
           </div>
         </div>
@@ -399,24 +349,22 @@ function UnoBoard({ session, socket, userName }: { session: SessionLike; socket:
         {others.map((name, idx) => {
           const cardsCount = state.players?.[name]?.cards?.length || 0;
           const isTurn = name === state.turn;
-          const seat = getSeatPosition(idx, others.length);
+          const seat = getSeatPosition(idx, others.length, isMobile);
           return (
             <motion.div
               key={name}
               className="absolute left-1/2 top-1/2 z-20"
               style={{ x: `calc(-50% + ${seat.x}vw)`, y: `calc(-50% + ${seat.y}vh)` }}
-              animate={isTurn ? { scale: 1.15 } : { scale: 1 }}
-              transition={{ type: "spring", stiffness: 300, damping: 25 }}
+              animate={isTurn ? { scale: 1.1 } : { scale: 1 }}
             >
-              <div className={`relative flex flex-col items-center gap-2 p-4 rounded-3xl backdrop-blur-2xl border transition-all duration-500 min-w-32 ${isTurn ? "bg-primary/10 border-primary shadow-[0_0_40px_rgba(139,92,246,0.3)] scale-110" : "bg-black/40 border-white/10"}`}>
-                <div className={`w-12 h-12 rounded-2xl flex items-center justify-center text-white font-black text-xl shadow-inner ${isTurn ? "bg-primary text-black" : "bg-white/10"}`}>
+              <div className={`relative flex flex-col items-center gap-1 p-2 md:p-3 rounded-2xl backdrop-blur-2xl border transition-all min-w-20 md:min-w-24 ${isTurn ? "bg-primary/10 border-primary shadow-xl" : "bg-black/40 border-white/5"}`}>
+                <div className={`w-8 h-8 md:w-10 md:h-10 rounded-lg flex items-center justify-center text-white font-black text-sm ${isTurn ? "bg-primary text-black" : "bg-white/5"}`}>
                   {name[0].toUpperCase()}
                 </div>
                 <div className="text-center">
-                  <p className="text-xs font-black text-white truncate max-w-[80px]">{name}</p>
-                  <p className={`text-[10px] font-bold ${isTurn ? "text-primary" : "text-white/30"}`}>{cardsCount} CARDS</p>
+                  <p className="text-[9px] md:text-[10px] font-black text-white truncate max-w-[60px] md:max-w-[80px]">{name}</p>
+                  <p className={`text-[8px] font-bold ${isTurn ? "text-primary" : "text-white/20"}`}>{cardsCount} C</p>
                 </div>
-                {isTurn && <div className="absolute -top-1 -right-1 w-3 h-3 bg-primary rounded-full animate-ping" />}
               </div>
             </motion.div>
           );
@@ -424,47 +372,34 @@ function UnoBoard({ session, socket, userName }: { session: SessionLike; socket:
       </div>
 
       {/* User Hand */}
-      <div className="fixed bottom-0 left-0 w-full p-8 z-50">
-        <div className="max-w-4xl mx-auto">
-          <div className="flex flex-col items-center gap-4">
-            <div className="px-6 py-2 rounded-full bg-black/60 backdrop-blur-xl border border-white/10 shadow-2xl flex items-center gap-6">
-              <span className="text-[10px] font-black text-white/30 uppercase tracking-[0.4em]">Your Battle Hand</span>
-              <span className="text-xs font-black text-primary">{myCards.length} Cards</span>
+      <div className="fixed bottom-0 left-0 w-full p-4 md:p-8 z-[60]">
+        <div className="max-w-4xl mx-auto relative">
+          <div className="flex flex-col items-center gap-2">
+            <div className="px-4 py-1 rounded-full bg-black/60 backdrop-blur-xl border border-white/5 shadow-xl flex items-center gap-4">
+              <span className="text-[8px] font-black text-white/30 uppercase tracking-[0.4em]">Battle Hand</span>
+              <span className="text-[10px] font-black text-primary">{myCards.length} Cards</span>
             </div>
             
-            <div className="w-full flex justify-center items-end px-10 h-52 -mb-8 overflow-visible">
+            <div className="w-full flex justify-center items-end px-4 h-40 md:h-52 -mb-4 overflow-visible">
               <div className="flex items-end perspective-1000">
                 {myCards.map((card, index) => {
                   const playable = isMyTurn && playableSet.has(card.id);
                   const isAnimatingOut = playedAnimCardId === card.id;
-                  const spread = 80 / (myCards.length || 1);
-                  const rotation = (index - (myCards.length - 1) / 2) * Math.min(spread * 0.5, 6);
+                  const rotation = (index - (myCards.length - 1) / 2) * Math.min(spread(myCards.length), 6);
                   
                   return (
                     <motion.button
                       key={card.id}
-                      type="button"
                       onPointerDown={() => onCardTap(card)}
                       disabled={!playable}
-                      initial={{ y: 100, opacity: 0 }}
                       animate={
                         isAnimatingOut
-                          ? { x: 0, y: -200, scale: 0.6, opacity: 0, rotate: 15 }
-                          : { 
-                              y: playable ? -15 : 0, 
-                              rotate: rotation, 
-                              opacity: 1,
-                              scale: playable ? 1.05 : 1,
-                              zIndex: index 
-                            }
+                          ? { y: -200, opacity: 0 }
+                          : { y: playable ? -10 : 0, rotate: rotation, zIndex: index }
                       }
-                      whileHover={playable ? { y: -45, scale: 1.15, zIndex: 100 } : {}}
-                      whileTap={playable ? { scale: 0.95 } : {}}
-                      className={`relative transition-all duration-300 ${index > 0 ? "-ml-12 md:-ml-16" : ""} group`}
+                      whileHover={playable ? { y: -30, scale: 1.1, zIndex: 100 } : {}}
+                      className={`relative transition-all duration-300 ${index > 0 ? "-ml-10 md:-ml-16" : ""} group`}
                     >
-                      {playable && (
-                        <div className="absolute -inset-1 rounded-2xl bg-primary/40 blur-xl animate-pulse opacity-0 group-hover:opacity-100 transition-opacity" />
-                      )}
                       <UnoCardFace card={card} playable={playable} />
                     </motion.button>
                   );
@@ -475,46 +410,10 @@ function UnoBoard({ session, socket, userName }: { session: SessionLike; socket:
         </div>
       </div>
 
-      {/* Modals & Overlays */}
       <AnimatePresence>
         {state.winner && (
-          <div className="fixed inset-0 bg-black/90 z-[200] flex items-center justify-center p-6 backdrop-blur-xl">
+          <div className="fixed inset-0 bg-black/95 z-[200] flex items-center justify-center p-6 backdrop-blur-xl">
             <WinnerFx winner={state.winner} />
-          </div>
-        )}
-
-        {selectedWildCardId && (
-          <div className="fixed inset-0 bg-black/80 z-[200] flex items-center justify-center p-6 backdrop-blur-md">
-            <motion.div
-              initial={{ scale: 0.9, opacity: 0 }}
-              animate={{ scale: 1, opacity: 1 }}
-              exit={{ scale: 0.9, opacity: 0 }}
-              className="w-full max-w-sm bg-[#0D1117] border border-white/10 rounded-[2.5rem] p-10 shadow-3xl text-center"
-            >
-              <h3 className="text-3xl font-black text-white mb-8 tracking-tight">PICK A COLOR</h3>
-              <div className="grid grid-cols-2 gap-4 mb-8">
-                {(["red", "blue", "green", "yellow"] as const).map((c) => (
-                  <button
-                    key={c}
-                    onPointerDown={() => {
-                      const card = myCards.find((x) => x.id === selectedWildCardId);
-                      if (card) playCard(card, c);
-                      setSelectedWildCardId(null);
-                    }}
-                    className={`h-24 rounded-3xl border-4 border-transparent hover:border-white transition-all flex items-center justify-center shadow-xl ${COLOR_META[c].bg}`}
-                  >
-                    <span className={`text-xs font-black uppercase tracking-widest ${c === "yellow" ? "text-black" : "text-white"}`}>{c}</span>
-                  </button>
-                ))}
-              </div>
-              <Button 
-                variant="ghost" 
-                className="w-full text-white/40 hover:text-white font-black uppercase tracking-widest"
-                onPointerDown={() => setSelectedWildCardId(null)}
-              >
-                Cancel
-              </Button>
-            </motion.div>
           </div>
         )}
       </AnimatePresence>
@@ -522,66 +421,45 @@ function UnoBoard({ session, socket, userName }: { session: SessionLike; socket:
   );
 }
 
+function spread(count: number) {
+  if (count <= 1) return 0;
+  return 80 / count;
+}
+
 function UnoCardFace({ card, playable, compact = false }: { card: UnoCard; playable: boolean; compact?: boolean }) {
   const meta = COLOR_META[card.color];
-  const baseSize = compact ? "h-36 w-24" : "h-44 w-30 md:h-52 md:w-36";
+  const baseSize = compact ? "h-28 w-18 md:h-36 md:w-24" : "h-36 w-24 md:h-52 md:w-36";
   const label = labelForCard(card);
 
   return (
     <div
-      className={`relative rounded-2xl md:rounded-3xl border-2 border-white/20 bg-gradient-to-br shadow-2xl overflow-hidden transition-all duration-500 ${meta.bg} ${playable ? "ring-4 ring-primary/40 border-primary/50" : "grayscale-[0.3]"} ${baseSize}`}
+      className={`relative rounded-xl md:rounded-3xl border border-white/20 bg-gradient-to-br shadow-2xl overflow-hidden transition-all duration-500 ${meta.bg} ${playable ? "ring-2 ring-primary/40 border-primary/50" : "grayscale-[0.3]"} ${baseSize}`}
     >
-      {/* Glossy Overlay */}
-      <div className="absolute inset-0 bg-gradient-to-tr from-white/10 via-transparent to-white/10 pointer-events-none" />
-      <div className="absolute top-[-50%] left-[-50%] w-[200%] h-[200%] bg-[radial-gradient(circle_at_center,rgba(255,255,255,0.1)_0%,transparent_50%)] pointer-events-none" />
-      
-      {/* Inner Frame */}
-      <div className="absolute inset-2 md:inset-3 rounded-xl md:rounded-2xl border border-white/20 flex flex-col items-center justify-center relative">
-        <div className="absolute inset-0 opacity-40 bg-[url('https://www.transparenttextures.com/patterns/carbon-fibre.png')] pointer-events-none" />
-        
-        {/* Corners */}
-        <div className={`absolute top-2 left-2 text-xs md:text-sm font-black ${meta.text}`}>{label}</div>
-        <div className={`absolute bottom-2 right-2 text-xs md:text-sm font-black rotate-180 ${meta.text}`}>{label}</div>
-
-        {/* Center Symbol */}
-        <div className={`z-10 ${meta.text} drop-shadow-[0_4px_12px_rgba(0,0,0,0.5)]`}>
-          {card.type === "number" && <span className="text-5xl md:text-7xl font-black italic tracking-tighter">{card.value}</span>}
-          {card.type === "skip" && <Ban className="w-16 h-16 md:w-20 md:h-20" strokeWidth={3} />}
-          {card.type === "reverse" && <RefreshCcw className="w-16 h-16 md:w-20 md:h-20" strokeWidth={3} />}
-          {card.type === "draw2" && <span className="text-4xl md:text-6xl font-black italic tracking-tighter">+2</span>}
-          {card.type === "wild" && <Sparkles className="w-16 h-16 md:w-20 md:h-20 text-white" strokeWidth={2.5} />}
-          {card.type === "wild4" && <span className="text-4xl md:text-6xl font-black italic tracking-tighter">+4</span>}
-        </div>
-
-        {/* Diagonal Stripe Accent */}
-        <div className="absolute inset-0 flex items-center justify-center opacity-10 rotate-[-45deg] pointer-events-none">
-          <div className="w-[150%] h-12 bg-white" />
+      <div className="absolute inset-1 md:inset-3 rounded-lg md:rounded-2xl border border-white/10 flex flex-col items-center justify-center">
+        <div className={`absolute top-1 left-1 md:top-2 md:left-2 text-[10px] md:text-sm font-black ${meta.text}`}>{label}</div>
+        <div className={`z-10 ${meta.text} drop-shadow-lg`}>
+          {card.type === "number" && <span className="text-3xl md:text-6xl font-black italic">{card.value}</span>}
+          {card.type === "skip" && <Ban className="w-10 h-10 md:w-16 md:h-16" strokeWidth={3} />}
+          {card.type === "reverse" && <RefreshCcw className="w-10 h-10 md:w-16 md:h-16" strokeWidth={3} />}
+          {card.type === "draw2" && <span className="text-2xl md:text-5xl font-black italic">+2</span>}
+          {card.type === "wild" && <Sparkles className="w-10 h-10 md:w-16 md:h-16" strokeWidth={2.5} />}
+          {card.type === "wild4" && <span className="text-2xl md:text-5xl font-black italic">+4</span>}
         </div>
       </div>
-
-      {/* Playable Indicator */}
-      {playable && (
-        <div className="absolute bottom-3 left-1/2 -translate-x-1/2">
-           <div className="px-3 py-1 rounded-full bg-white/20 backdrop-blur-md text-[8px] font-black text-white uppercase tracking-widest border border-white/20">Playable</div>
-        </div>
-      )}
     </div>
   );
 }
 
 function WinnerFx({ winner }: { winner: string }) {
   return (
-    <div className="relative text-center animate-in zoom-in duration-500">
-      <div className="w-40 h-40 bg-yellow-400 rounded-full mx-auto flex items-center justify-center shadow-[0_0_80px_rgba(250,204,21,0.5)] mb-8 animate-bounce">
-        <Sparkles className="w-20 h-20 text-black" />
+    <div className="text-center animate-in zoom-in duration-500">
+      <div className="w-32 h-32 bg-yellow-400 rounded-full mx-auto flex items-center justify-center shadow-3xl mb-8 animate-bounce">
+        <Sparkles className="w-16 h-16 text-black" />
       </div>
-      <h2 className="text-7xl font-black font-outfit text-white tracking-tighter italic mb-4">VICTORY!</h2>
-      <p className="text-3xl font-bold text-white/80 uppercase tracking-[0.2em] mb-12">{winner} WON THE BATTLE</p>
-      <Button 
-        onPointerDown={() => window.location.href = "/"} 
-        className="h-16 px-12 bg-white text-black font-black text-lg uppercase tracking-widest hover:bg-primary transition-all rounded-2xl"
-      >
-        Return to HQ
+      <h2 className="text-5xl md:text-7xl font-black font-outfit text-white tracking-tighter italic mb-4 uppercase">Victory!</h2>
+      <p className="text-xl md:text-2xl font-bold text-white/80 uppercase tracking-widest mb-12">{winner} Won</p>
+      <Button onPointerDown={() => window.location.href = "/"} className="h-14 px-10 bg-white text-black font-black text-base uppercase tracking-widest rounded-xl">
+        Lobby
       </Button>
     </div>
   );

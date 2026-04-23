@@ -560,37 +560,37 @@ function LudoBoard({ session, socket, userName }: { session: SessionLike; socket
         </div>
       )}
 
-      <div className="fixed bottom-6 right-6 z-[60] flex flex-col gap-3">
+      <div className="fixed bottom-6 right-6 z-[60] flex flex-col gap-2 md:gap-3">
          {['🔥', '😂', '😲', '👏', '💔'].map(emoji => (
            <button
              key={emoji}
              onClick={() => sendReaction(emoji)}
-             className="w-12 h-12 rounded-full bg-white/10 backdrop-blur-xl border border-white/20 flex items-center justify-center text-2xl shadow-2xl hover:scale-125 transition-transform active:scale-90"
+             className="w-10 h-10 md:w-12 md:h-12 rounded-full bg-white/10 backdrop-blur-xl border border-white/20 flex items-center justify-center text-xl md:text-2xl shadow-2xl hover:scale-125 transition-transform active:scale-90"
            >
              {emoji}
            </button>
          ))}
       </div>
 
-      <div className="w-full grid grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
+      <div className="w-full grid grid-cols-2 lg:grid-cols-4 gap-2 md:gap-4 mb-4 md:mb-8">
         {state.players.map((p) => {
           const isTurn = p.name === state.turn;
           return (
             <div
               key={p.name}
-              className={`relative overflow-hidden rounded-2xl border-2 p-4 transition-all duration-500 ${isTurn ? "border-white bg-white/10 shadow-[0_0_40px_rgba(255,255,255,0.15)] scale-105" : "border-white/5 bg-black/40"}`}
+              className={`relative overflow-hidden rounded-xl md:rounded-2xl border-2 p-2 md:p-4 transition-all duration-500 ${isTurn ? "border-white bg-white/10 shadow-lg scale-105" : "border-white/5 bg-black/40"}`}
             >
-              <div className="flex items-center gap-3">
-                <div className={`w-12 h-12 rounded-2xl ${COLOR_CONFIG[p.color].bg} flex items-center justify-center shadow-xl border-2 border-white/20`}>
-                  <User className="w-6 h-6 text-white" />
+              <div className="flex items-center gap-2 md:gap-3">
+                <div className={`w-8 h-8 md:w-12 md:h-12 rounded-lg md:rounded-2xl ${COLOR_CONFIG[p.color].bg} flex items-center justify-center shadow-xl border-2 border-white/20`}>
+                  <User className="w-4 h-4 md:w-6 md:h-6 text-white" />
                 </div>
                 <div className="flex flex-col min-w-0">
-                  <span className="text-base font-black text-white truncate uppercase tracking-tight">{p.name}</span>
-                  <span className="text-[10px] font-black text-white/40 uppercase tracking-widest">{isTurn ? "ROLLING..." : "WAITING"}</span>
+                  <span className="text-xs md:text-base font-black text-white truncate uppercase tracking-tight">{p.name}</span>
+                  <span className="text-[8px] md:text-[10px] font-black text-white/40 uppercase tracking-widest">{isTurn ? "ROLLING" : "WAIT"}</span>
                 </div>
               </div>
               {isTurn && (
-                <div className="absolute bottom-0 left-0 h-1 bg-white w-full overflow-hidden">
+                <div className="absolute bottom-0 left-0 h-0.5 md:h-1 bg-white w-full overflow-hidden">
                   <div className="absolute inset-0 bg-white/50 animate-pulse" />
                 </div>
               )}
