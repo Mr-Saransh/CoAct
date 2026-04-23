@@ -548,7 +548,7 @@ function LudoBoard({ session, socket, userName }: { session: SessionLike; socket
   };
 
   return (
-    <div className="w-full max-w-5xl mx-auto px-2 py-4 flex flex-col items-center relative animate-in fade-in duration-700 font-outfit">
+    <div className="w-full max-w-5xl mx-auto px-4 py-8 pb-40 flex flex-col items-center relative animate-in fade-in duration-700 font-outfit">
       <FloatingReactions sessionId={session.id} socket={socket} />
       
       {isSpectator && (

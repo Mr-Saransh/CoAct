@@ -289,39 +289,43 @@ function UnoBoard({ session, socket, userName }: { session: SessionLike; socket:
   const isSpectator = session.spectators.includes(me);
 
   return (
-    <div className="w-full max-w-6xl mx-auto p-2 md:p-10 pb-40 relative font-outfit select-none flex flex-col h-full overflow-hidden">
+    <div className="w-full max-w-6xl mx-auto p-4 md:p-10 pb-32 relative font-outfit select-none flex flex-col gap-8 md:gap-12 min-h-screen">
       <FloatingReactions sessionId={session.id} socket={socket} />
       
-      {/* Header Info */}
-      <div className="flex items-center justify-between mb-4 md:mb-8 px-4 relative z-50">
-        <div className="flex items-center gap-2 md:gap-4">
-          <div className={`px-4 py-2 rounded-xl bg-black/40 border border-white/10 backdrop-blur-xl shadow-2xl transition-all ${isMyTurn ? "border-primary/50 ring-1 ring-primary/20" : ""}`}>
-            <p className="text-[8px] font-black text-white/30 uppercase tracking-[0.2em]">Turn</p>
-            <span className="text-[10px] md:text-sm font-black text-white truncate max-w-[80px] md:max-w-[120px] block">{state.turn}</span>
+      {/* Header Stats */}
+      <div className="flex items-center justify-between px-4 shrink-0">
+        <div className="flex items-center gap-4">
+          <div className={`p-4 rounded-2xl bg-black/40 border border-white/10 backdrop-blur-xl shadow-2xl transition-all ${isMyTurn ? "border-primary/50 ring-2 ring-primary/20" : ""}`}>
+            <p className="text-[10px] font-black text-white/30 uppercase tracking-[0.2em] mb-1">Active Turn</p>
+            <div className="flex items-center gap-3">
+              <span className="text-sm font-black text-white truncate max-w-[120px]">{state.turn}</span>
+              {isMyTurn && <div className="px-2 py-0.5 rounded-md bg-primary text-black text-[9px] font-black">YOU</div>}
+            </div>
           </div>
-          <div className="px-4 py-2 rounded-xl bg-black/40 border border-white/10 backdrop-blur-xl shadow-2xl">
-            <p className="text-[8px] font-black text-white/30 uppercase tracking-[0.2em]">Time</p>
-            <span className={`text-[10px] md:text-sm font-black ${secondsLeft < 10 ? "text-red-400 animate-pulse" : "text-white"}`}>{secondsLeft}s</span>
+          <div className="p-4 rounded-2xl bg-black/40 border border-white/10 backdrop-blur-xl shadow-2xl">
+            <p className="text-[10px] font-black text-white/30 uppercase tracking-[0.2em] mb-1">Time Left</p>
+            <span className={`text-sm font-black ${secondsLeft < 10 ? "text-red-400 animate-pulse" : "text-white"}`}>{secondsLeft}s</span>
           </div>
         </div>
-        <div className={`w-8 h-8 rounded-full shadow-lg border-2 border-white/20 ${currentColorMeta.bg.split(' ')[1]}`} />
+        <div className={`w-10 h-10 rounded-full shadow-lg border-2 border-white/20 ${currentColorMeta.bg.split(' ')[1]}`} />
       </div>
 
-      <div className="flex-1 relative min-h-[300px] md:min-h-[400px] rounded-[2.5rem] border border-white/5 bg-[#0A0D14]/40 backdrop-blur-3xl shadow-3xl overflow-hidden">
-        <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,rgba(255,255,255,0.02)_0%,transparent_70%)] pointer-events-none" />
+      {/* Main Arena Area */}
+      <div className="flex-1 relative min-h-[400px] md:min-h-[500px] rounded-[3rem] border border-white/10 bg-[#0A0D14]/40 backdrop-blur-3xl shadow-3xl overflow-hidden shrink-0">
+        <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,rgba(255,255,255,0.03)_0%,transparent_70%)] pointer-events-none" />
         
         {/* Center Deck Area */}
-        <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 flex items-center gap-4 md:gap-12 z-10 scale-[0.8] md:scale-110">
-          <div className="flex flex-col items-center gap-2">
-            <p className="text-[8px] font-black text-white/20 uppercase tracking-[0.3em]">Discard</p>
+        <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 flex items-center gap-12 z-30 scale-110">
+          <div className="flex flex-col items-center gap-3">
+            <p className="text-[10px] font-black text-white/20 uppercase tracking-[0.3em]">Discard</p>
             <div className="relative">
               <AnimatePresence mode="wait">
                 {state.currentCard && (
                   <motion.div
                     key={state.currentCard.id}
-                    initial={{ opacity: 0, x: 100, y: -50, rotate: 25, scale: 0.5 }}
-                    animate={{ opacity: 1, x: 0, y: 0, rotate: (state.lastEvent?.timestamp || 0) % 15 - 7, scale: 1 }}
-                    exit={{ opacity: 0, scale: 0.8, x: -20 }}
+                    initial={{ opacity: 0, x: 50, y: -20, rotate: 15, scale: 0.8 }}
+                    animate={{ opacity: 1, x: 0, y: 0, rotate: (state.lastEvent?.timestamp || 0) % 10 - 5, scale: 1 }}
+                    exit={{ opacity: 0, scale: 0.8 }}
                   >
                     <UnoCardFace card={state.currentCard} playable={false} compact />
                   </motion.div>
@@ -330,16 +334,16 @@ function UnoBoard({ session, socket, userName }: { session: SessionLike; socket:
             </div>
           </div>
 
-          <div className="flex flex-col items-center gap-2">
-            <p className="text-[8px] font-black text-white/20 uppercase tracking-[0.3em]">Draw</p>
+          <div className="flex flex-col items-center gap-3">
+            <p className="text-[10px] font-black text-white/20 uppercase tracking-[0.3em]">Draw</p>
             <motion.button
               onPointerDown={drawCard}
               disabled={!isMyTurn || state.hasDrawnThisTurn}
-              className={`relative rounded-xl w-22 h-32 md:w-24 md:h-34 border-2 border-white/10 bg-[#1A1F2B] overflow-hidden shadow-2xl transition-all ${isMyTurn && !state.hasDrawnThisTurn ? "cursor-pointer ring-2 ring-primary/40 border-primary/50" : "grayscale opacity-40"}`}
+              className={`relative rounded-2xl w-24 h-34 border-2 border-white/10 bg-[#1A1F2B] overflow-hidden shadow-2xl transition-all ${isMyTurn && !state.hasDrawnThisTurn ? "cursor-pointer ring-4 ring-primary/40 border-primary/50" : "grayscale opacity-40 cursor-not-allowed"}`}
             >
               <div className="absolute inset-0 bg-gradient-to-br from-primary/10 to-transparent" />
               <div className="absolute inset-0 flex items-center justify-center">
-                <span className="text-[10px] font-black text-white/10 tracking-tighter italic">COACT</span>
+                <span className="text-sm font-black text-white/10 tracking-tighter italic">COACT</span>
               </div>
             </motion.button>
           </div>
@@ -357,13 +361,13 @@ function UnoBoard({ session, socket, userName }: { session: SessionLike; socket:
               style={{ x: `calc(-50% + ${seat.x}vw)`, y: `calc(-50% + ${seat.y}vh)` }}
               animate={isTurn ? { scale: 1.1 } : { scale: 1 }}
             >
-              <div className={`relative flex flex-col items-center gap-1 p-2 md:p-3 rounded-2xl backdrop-blur-2xl border transition-all min-w-20 md:min-w-24 ${isTurn ? "bg-primary/10 border-primary shadow-xl" : "bg-black/40 border-white/5"}`}>
-                <div className={`w-8 h-8 md:w-10 md:h-10 rounded-lg flex items-center justify-center text-white font-black text-sm ${isTurn ? "bg-primary text-black" : "bg-white/5"}`}>
+              <div className={`relative flex flex-col items-center gap-2 p-3 rounded-2xl backdrop-blur-2xl border transition-all min-w-[100px] ${isTurn ? "bg-primary/10 border-primary shadow-xl" : "bg-black/40 border-white/10"}`}>
+                <div className={`w-10 h-10 rounded-xl flex items-center justify-center text-white font-black text-lg ${isTurn ? "bg-primary text-black" : "bg-white/10"}`}>
                   {name[0].toUpperCase()}
                 </div>
-                <div className="text-center">
-                  <p className="text-[9px] md:text-[10px] font-black text-white truncate max-w-[60px] md:max-w-[80px]">{name}</p>
-                  <p className={`text-[8px] font-bold ${isTurn ? "text-primary" : "text-white/20"}`}>{cardsCount} C</p>
+                <div className="text-center w-full px-2">
+                  <p className="text-[10px] font-black text-white truncate w-full uppercase tracking-tight">{name}</p>
+                  <p className={`text-[8px] font-bold ${isTurn ? "text-primary" : "text-white/30"}`}>{cardsCount} CARDS</p>
                 </div>
               </div>
             </motion.div>
@@ -371,40 +375,38 @@ function UnoBoard({ session, socket, userName }: { session: SessionLike; socket:
         })}
       </div>
 
-      {/* User Hand */}
-      <div className="fixed bottom-0 left-0 w-full p-4 md:p-8 z-[60]">
-        <div className="max-w-4xl mx-auto relative">
-          <div className="flex flex-col items-center gap-2">
-            <div className="px-4 py-1 rounded-full bg-black/60 backdrop-blur-xl border border-white/5 shadow-xl flex items-center gap-4">
-              <span className="text-[8px] font-black text-white/30 uppercase tracking-[0.4em]">Battle Hand</span>
-              <span className="text-[10px] font-black text-primary">{myCards.length} Cards</span>
-            </div>
-            
-            <div className="w-full flex justify-center items-end px-4 h-40 md:h-52 -mb-4 overflow-visible">
-              <div className="flex items-end perspective-1000">
-                {myCards.map((card, index) => {
-                  const playable = isMyTurn && playableSet.has(card.id);
-                  const isAnimatingOut = playedAnimCardId === card.id;
-                  const rotation = (index - (myCards.length - 1) / 2) * Math.min(spread(myCards.length), 6);
-                  
-                  return (
-                    <motion.button
-                      key={card.id}
-                      onPointerDown={() => onCardTap(card)}
-                      disabled={!playable}
-                      animate={
-                        isAnimatingOut
-                          ? { y: -200, opacity: 0 }
-                          : { y: playable ? -10 : 0, rotate: rotation, zIndex: index }
-                      }
-                      whileHover={playable ? { y: -30, scale: 1.1, zIndex: 100 } : {}}
-                      className={`relative transition-all duration-300 ${index > 0 ? "-ml-10 md:-ml-16" : ""} group`}
-                    >
-                      <UnoCardFace card={card} playable={playable} />
-                    </motion.button>
-                  );
-                })}
-              </div>
+      {/* User Hand Area - Now in Flow */}
+      <div className="w-full py-12 shrink-0">
+        <div className="max-w-4xl mx-auto flex flex-col items-center gap-6">
+          <div className="px-6 py-2 rounded-full bg-black/60 backdrop-blur-xl border border-white/10 shadow-2xl flex items-center gap-6">
+            <span className="text-[10px] font-black text-white/30 uppercase tracking-[0.4em]">Battle Hand</span>
+            <span className="text-xs font-black text-primary">{myCards.length} Cards</span>
+          </div>
+          
+          <div className="w-full flex justify-center items-end px-10 h-52 overflow-visible">
+            <div className="flex items-end perspective-1000">
+              {myCards.map((card, index) => {
+                const playable = isMyTurn && playableSet.has(card.id);
+                const isAnimatingOut = playedAnimCardId === card.id;
+                const rotation = (index - (myCards.length - 1) / 2) * Math.min(spread(myCards.length), 6);
+                
+                return (
+                  <motion.button
+                    key={card.id}
+                    onPointerDown={() => onCardTap(card)}
+                    disabled={!playable}
+                    animate={
+                      isAnimatingOut
+                        ? { y: -200, opacity: 0 }
+                        : { y: playable ? -15 : 0, rotate: rotation, zIndex: index }
+                    }
+                    whileHover={playable ? { y: -45, scale: 1.15, zIndex: 100 } : {}}
+                    className={`relative transition-all duration-300 ${index > 0 ? "-ml-12 md:-ml-16" : ""} group`}
+                  >
+                    <UnoCardFace card={card} playable={playable} />
+                  </motion.button>
+                );
+              })}
             </div>
           </div>
         </div>
