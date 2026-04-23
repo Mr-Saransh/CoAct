@@ -586,6 +586,3 @@ function WinnerFx({ winner }: { winner: string }) {
     </div>
   );
 }
-   </div>
-  );
-}
