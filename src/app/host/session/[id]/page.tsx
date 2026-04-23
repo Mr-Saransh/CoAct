@@ -361,7 +361,9 @@ function HostSessionContent() {
         {/* Main Content Area */}
         <main className={`flex-1 relative flex flex-col min-h-0 ${isLive ? "" : "overflow-y-auto"}`}>
           {isLive && socket ? (
-            <div className="w-full h-full flex-1 relative overflow-hidden">
+            <div className={`w-full h-full flex-1 relative ${
+              currentMode === "board" || currentMode === "thoughtmap" ? "overflow-hidden" : "overflow-y-auto custom-scrollbar"
+            }`}>
               {currentMode === "board" ? <ThinkingBoard socket={socket} sessionId={sessionId} userName={hostName} session={session} isHost={true} /> :
               currentMode === "poll" ? <LivePollHost session={session} updateActivity={updateActivity} /> :
               currentMode === "quiz" || currentMode === "trivia" ? <QuizHost session={session} updateActivity={updateActivity} /> :

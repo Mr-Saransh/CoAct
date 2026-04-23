@@ -113,11 +113,13 @@ function Lobby({ session, userName, socket }: {
           transition={{ type: "spring", damping: 25, stiffness: 200 }}
         >
           <Card className="border-white/5 bg-[#121826]/40 backdrop-blur-3xl shadow-[0_32px_64px_-12px_rgba(0,0,0,0.8)] overflow-hidden text-white relative z-20 rounded-[3rem] ring-1 ring-white/10">
-            <CardContent className="p-12 text-center relative overflow-hidden">
+            <div className={`w-full h-full flex-1 relative ${
+              session.mode === "board" || session.mode === "thoughtmap" ? "overflow-hidden" : "overflow-y-auto custom-scrollbar"
+            }`}>
               {/* Subtle Animated Glow */}
               <div className="absolute -top-24 -left-24 w-48 h-48 bg-primary/20 rounded-full blur-[60px] animate-pulse" />
               
-              <div className="relative z-10">
+              <div className="relative z-10 p-12 text-center">
                 <div className="w-24 h-24 rounded-3xl bg-gradient-to-br from-primary to-blue-600 flex items-center justify-center mx-auto mb-8 shadow-2xl rotate-3 transform group-hover:rotate-0 transition-transform duration-500">
                   <span className="text-4xl font-black text-black">{userName[0].toUpperCase()}</span>
                 </div>
@@ -216,7 +218,9 @@ function ActivityView({ session, userName, socket }: {
         </div>
       </header>
 
-      <main className="flex-1 w-full relative z-10 min-h-0 flex flex-col overflow-hidden">
+      <main className={`flex-1 w-full relative z-10 min-h-0 flex flex-col ${
+        session.mode === 'board' || session.mode === 'thoughtmap' ? 'overflow-hidden' : 'overflow-y-auto custom-scrollbar'
+      }`}>
         <AnimatePresence mode="wait">
           <motion.div
             key={session.mode}
