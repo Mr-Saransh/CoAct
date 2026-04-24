@@ -3,7 +3,7 @@
 import React, { useState, useRef, useCallback, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { useSocket } from "@/components/providers/SocketProvider";
-import { Network, BrainCircuit, Maximize, Trash2, Link2, X, Palette } from "lucide-react";
+import { Network, BrainCircuit, Maximize, Trash2, Link2, X, Palette, ZoomIn, ZoomOut } from "lucide-react";
 
 interface ThoughtNode {
   id: string;
@@ -291,61 +291,67 @@ function SharedCanvas({
       />
 
       {/* Toolbar */}
-      <div className="absolute top-4 left-4 z-20 flex flex-wrap gap-2">
-        <Button
-          size="sm"
-          variant="secondary"
-          onClick={autoCluster}
-          className="bg-white/10 text-white hover:bg-white/20 border-white/10 backdrop-blur text-xs px-3 h-10"
-        >
-          <BrainCircuit className="w-4 h-4 mr-1.5" /> Auto-Cluster
-        </Button>
-        <Button
-          size="sm"
-          variant="secondary"
-          onClick={() => {
-            setPan({ x: 0, y: 0 });
-            setScale(1);
-          }}
-          className="bg-white/10 text-white hover:bg-white/20 border-white/10 backdrop-blur w-10 h-10 p-0"
-        >
-          <Maximize className="w-4 h-4" />
-        </Button>
-        <Button
-          size="sm"
-          variant={connectMode ? "default" : "secondary"}
-          onClick={() => {
-            setConnectMode(!connectMode);
-            setConnectFrom(null);
-          }}
-          className={`backdrop-blur text-xs px-3 h-10 ${
-            connectMode
+      <div className="absolute top-4 left-4 right-4 z-20 flex flex-wrap items-center justify-between gap-3 pointer-events-none">
+        <div className="flex flex-wrap gap-2 pointer-events-auto">
+          <Button
+            size="sm"
+            variant="secondary"
+            onClick={autoCluster}
+            className="bg-white/10 text-white hover:bg-white/20 border-white/10 backdrop-blur text-xs px-3 h-10"
+          >
+            <BrainCircuit className="w-4 h-4 mr-1.5" /> Auto-Cluster
+          </Button>
+          <div className="flex bg-white/10 backdrop-blur rounded-xl p-1 border border-white/10">
+            <button onClick={() => setScale(s => Math.min(3, s * 1.2))} className="p-2 w-10 h-10 flex items-center justify-center text-white/60 hover:text-white" title="Zoom In"><ZoomIn className="w-4 h-4" /></button>
+            <button onClick={() => setScale(s => Math.max(0.2, s / 1.2))} className="p-2 w-10 h-10 flex items-center justify-center text-white/60 hover:text-white" title="Zoom Out"><ZoomOut className="w-4 h-4" /></button>
+            <button onClick={() => { setScale(1); setPan({ x: 0, y: 0 }); }} className="p-2 w-10 h-10 flex items-center justify-center text-white/60 hover:text-white" title="Reset View"><Maximize className="w-4 h-4" /></button>
+          </div>
+
+          <Button
+            size="sm"
+            variant={connectMode ? "default" : "secondary"}
+            onClick={() => {
+              setConnectMode(!connectMode);
+              setConnectFrom(null);
+            }}
+            className={`backdrop-blur text-xs px-3 h-10 ${connectMode
               ? "bg-violet-500 text-white hover:bg-violet-600"
               : "bg-white/10 text-white hover:bg-white/20 border-white/10"
-          }`}
-        >
-          <Link2 className="w-4 h-4 mr-1.5" /> {connectMode ? (connectFrom ? "Click target..." : "Click source...") : "Connect"}
-        </Button>
+            }`}
+          >
+            <Link2 className="w-4 h-4 mr-1.5" /> {connectMode ? (connectFrom ? "Click target..." : "Click source...") : "Connect"}
+          </Button>
+
+          {isHost && (
+            <Button
+              size="sm"
+              variant="destructive"
+              onClick={() => socket.emit("session:end", { sessionId })}
+              className="text-xs px-3 h-10 rounded-xl font-bold gap-2"
+            >
+              <X className="w-4 h-4" /> Exit Board
+            </Button>
+          )}
+        </div>
       </div>
 
-      {/* Info */}
-      <div className="absolute top-4 right-4 z-20 flex items-center gap-2">
-        <div className="bg-white/10 backdrop-blur px-4 py-2 rounded-full border border-white/10 text-sm font-bold text-white">
-          {nodes.length} Ideas
-        </div>
-        <div className="bg-white/10 backdrop-blur px-3 py-2 rounded-full border border-white/10 text-xs text-white/60">
-          Double-tap to add
+      <div className="absolute bottom-4 right-4 z-20 flex flex-col sm:flex-row items-end sm:items-center gap-2 pointer-events-none">
+        <div className="flex gap-2">
+          <div className="bg-white/10 backdrop-blur-md px-4 py-2 rounded-full border border-white/10 text-[10px] sm:text-sm font-bold text-white shadow-xl pointer-events-auto">
+            {nodes.length} Ideas
+          </div>
+          <div className="bg-white/10 backdrop-blur-md px-3 py-2 rounded-full border border-white/10 text-[9px] sm:text-xs text-white/60 shadow-xl hidden xs:block pointer-events-auto">
+            Double-tap to add
+          </div>
         </div>
       </div>
 
-      {/* Canvas Layer */}
       <div
         className="absolute inset-0 origin-top-left pointer-events-none"
         style={{
           transform: `translate(${pan.x}px, ${pan.y}px) scale(${scale})`,
         }}
       >
-        {/* Arrows/Connections */}
         <svg style={{ position: 'absolute', overflow: 'visible', width: '1px', height: '1px', left: 0, top: 0, pointerEvents: 'none' }}>
           {connections.map((conn) => {
             const from = getNodeCenter(conn.from);
@@ -354,8 +360,6 @@ function SharedCanvas({
             const dx = to.x - from.x;
             const dy = to.y - from.y;
             const angle = Math.atan2(dy, dx);
-            const len = Math.hypot(dx, dy);
-            // Arrow tip offset
             const tipX = to.x - Math.cos(angle) * 20;
             const tipY = to.y - Math.sin(angle) * 20;
             return (
@@ -369,7 +373,6 @@ function SharedCanvas({
                   strokeWidth={2}
                   strokeDasharray="6,4"
                 />
-                {/* Arrowhead */}
                 <polygon
                   points={`${tipX},${tipY} ${tipX - 10 * Math.cos(angle - 0.4)},${tipY - 10 * Math.sin(angle - 0.4)} ${tipX - 10 * Math.cos(angle + 0.4)},${tipY - 10 * Math.sin(angle + 0.4)}`}
                   fill="rgba(255,255,255,0.4)"
@@ -379,7 +382,6 @@ function SharedCanvas({
           })}
         </svg>
 
-        {/* Nodes */}
         {nodes.map((node) => {
           const nc = getNodeColor(node.color);
           const isConnectSource = connectFrom === node.id;
@@ -405,7 +407,6 @@ function SharedCanvas({
                 }
               }}
             >
-              {/* Sticker Node */}
               <div
                 className="rounded-2xl p-4 shadow-lg border-2 relative group transition-shadow hover:shadow-xl"
                 style={{
@@ -414,7 +415,6 @@ function SharedCanvas({
                   boxShadow: `0 4px 20px ${nc.bg}33, 0 8px 40px rgba(0,0,0,0.3)`,
                 }}
               >
-                {/* Sticker fold effect */}
                 <div
                   className="absolute top-0 right-0 w-6 h-6 rounded-bl-xl"
                   style={{ backgroundColor: `${nc.bg}cc`, boxShadow: `inset -2px 2px 4px rgba(0,0,0,0.1)` }}
@@ -485,7 +485,6 @@ function SharedCanvas({
                   </div>
                 </div>
 
-                {/* Color picker dropdown */}
                 {showColorPicker === node.id && (
                   <div className="absolute -bottom-14 left-0 flex gap-2 bg-black/80 backdrop-blur rounded-xl p-3 z-50 border border-white/10">
                     {NODE_COLORS.map((c) => (

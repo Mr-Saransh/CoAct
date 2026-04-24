@@ -8,7 +8,7 @@ import { useSocket } from "@/components/providers/SocketProvider";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { WifiOff, ArrowRight, Users, MessageCircle, Mic } from "lucide-react";
+import { WifiOff, ArrowRight, Users, MessageCircle, Mic, ShieldOff } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ThinkingBoard } from "@/components/activities/ThinkingBoard";
@@ -24,6 +24,7 @@ import { GroupStudyParticipant } from "@/components/activities/GroupStudy";
 import { UnoParticipant } from "@/components/activities/UnoGame";
 import { LudoParticipant } from "@/components/activities/LudoGame";
 import { SessionControls } from "@/components/session/SessionControls";
+import { SessionFloatingController } from "@/components/session/SessionFloatingController";
 
 // New DECIDE components
 import { ThoughtMapParticipant } from "@/components/activities/ThoughtMap";
@@ -31,7 +32,7 @@ import { CourtroomParticipant } from "@/components/activities/CourtroomMode";
 import { DuelDebateParticipant } from "@/components/activities/DuelDebate";
 import { DecisionEngineParticipant } from "@/components/activities/DecisionEngine";
 
-import Antakshari from "@/components/activities/Antakshari";
+
 import RMCSGame from "@/components/activities/RMCSGame";
 
 
@@ -41,7 +42,7 @@ function LoadingSpinner() {
   );
 }
 
-function NameEntry({ sessionId, onJoin }: { sessionId: string; onJoin: (name: string) => void }) {
+function NameEntry({ sessionId, onJoin, error }: { sessionId: string; onJoin: (name: string) => void; error?: string | null }) {
   const [name, setName] = useState("");
 
   useEffect(() => {
@@ -73,17 +74,32 @@ function NameEntry({ sessionId, onJoin }: { sessionId: string; onJoin: (name: st
                 ID: {sessionId}
               </p>
             </div>
+
+            {error && (
+              <motion.div 
+                initial={{ opacity: 0, y: -10 }}
+                animate={{ opacity: 1, y: 0 }}
+                className="mb-6 p-4 rounded-xl bg-red-500/10 border border-red-500/20 text-red-500 text-xs font-bold text-center leading-relaxed"
+              >
+                {error}
+              </motion.div>
+            )}
+
             <form onSubmit={handleJoin} className="space-y-4">
               <Input
                 placeholder="Your Name"
-                className="bg-white/5 border-white/10 h-14 text-lg text-white"
+                className="bg-white/5 border-white/10 h-14 text-lg text-white focus:ring-primary focus:border-primary"
                 value={name}
                 onChange={(e) => setName(e.target.value)}
                 maxLength={20}
                 required
               />
-              <button type="submit" className="w-full h-14 bg-primary text-black rounded-xl font-black text-lg shadow-lg touch-manipulation active:scale-95 transition-transform" disabled={!name.trim()}>
-                JOIN NOW
+              <button 
+                type="submit" 
+                className="w-full h-14 bg-primary text-black rounded-xl font-black text-lg shadow-lg touch-manipulation active:scale-95 transition-transform disabled:opacity-50 disabled:active:scale-100 disabled:grayscale" 
+                disabled={!name.trim() || !!error?.toLowerCase().includes("banned")}
+              >
+                {error?.toLowerCase().includes("banned") ? "BANNED" : "JOIN NOW"}
               </button>
             </form>
           </CardContent>
@@ -185,7 +201,7 @@ function ActivityView({ session, userName, socket }: {
     if (mode === "courtroom") return <CourtroomParticipant session={session} socket={socket} userName={userName} />;
     if (mode === "duel") return <DuelDebateParticipant session={session} socket={socket} userName={userName} />;
     if (mode === "decision") return <DecisionEngineParticipant session={session} socket={socket} userName={userName} />;
-    if (mode === "antakshari") return <Antakshari session={session} socket={socket} userName={userName} isHost={false} />;
+
     if (mode === "rmcs") return <RMCSGame session={session} socket={socket} userName={userName} isHost={false} />;
 
     return (
@@ -200,26 +216,28 @@ function ActivityView({ session, userName, socket }: {
     <div className="h-[100dvh] bg-[#020617] flex flex-col relative text-white isolate overflow-hidden">
       <div className="fixed inset-0 pointer-events-none -z-10 bg-[#020617]" />
       
-      <header className="h-16 md:h-14 border-b border-white/5 flex items-center justify-between px-4 shrink-0 bg-[#0A0D14]/80 backdrop-blur-md z-40">
-        <div className="flex items-center gap-2">
-          <div className="relative w-28 h-8 md:w-40 md:h-12">
-            <Image 
-              src="/logo.png" 
-              alt="CoAct Logo" 
-              fill
-              sizes="(max-width: 768px) 112px, 160px"
-              className="object-contain"
-              priority
-            />
+      {!(session.mode === 'board' || session.mode === 'thoughtmap') && (
+        <header className="h-16 md:h-14 border-b border-white/5 flex items-center justify-between px-4 shrink-0 bg-[#0A0D14]/80 backdrop-blur-md z-40">
+          <div className="flex items-center gap-2">
+            <div className="relative w-28 h-8 md:w-40 md:h-12">
+              <Image 
+                src="/logo.png" 
+                alt="CoAct Logo" 
+                fill
+                sizes="(max-width: 768px) 112px, 160px"
+                className="object-contain"
+                priority
+              />
+            </div>
           </div>
-        </div>
-        <div className="text-[10px] font-black text-white/40 uppercase tracking-widest bg-white/5 px-3 py-1 rounded-full border border-white/5">
-          {session.mode}
-        </div>
-      </header>
+          <div className="text-[10px] font-black text-white/40 uppercase tracking-widest bg-white/5 px-3 py-1 rounded-full border border-white/5">
+            {session.mode}
+          </div>
+        </header>
+      )}
 
       <main className={`flex-1 w-full relative z-10 min-h-0 flex flex-col ${
-        session.mode === 'board' || session.mode === 'thoughtmap' ? 'overflow-hidden' : 'overflow-y-auto custom-scrollbar'
+        session.mode === 'board' || session.mode === 'thoughtmap' || session.mode === 'uno' ? 'overflow-hidden' : 'overflow-y-auto custom-scrollbar'
       }`}>
         <AnimatePresence mode="wait">
           <motion.div
@@ -229,7 +247,7 @@ function ActivityView({ session, userName, socket }: {
             exit={{ opacity: 0, y: -10 }}
             transition={{ duration: 0.3 }}
             className={`w-full h-full flex flex-col items-center justify-center ${
-              session.mode === 'board' || session.mode === 'thoughtmap' ? '' : 'p-4 md:p-8'
+              session.mode === 'board' || session.mode === 'thoughtmap' || session.mode === 'uno' ? '' : 'p-4 md:p-8'
             }`}
           >
             {renderActivity()}
@@ -250,7 +268,7 @@ function SessionContent() {
 
   const [userName, setUserName] = useState(nameFromUrl || "");
   const { socket, isConnected } = useSocket();
-  const { session, error, isKicked } = useSession(sessionId, userName, "participant");
+  const { session, error, isKicked, userId } = useSession(sessionId, userName, "participant");
   const [isRedirecting, setIsRedirecting] = useState(false);
 
   const safeNavigate = useCallback((target: string) => {
@@ -268,22 +286,17 @@ function SessionContent() {
     }
   }, [isRedirecting]);
 
-  if (isKicked) {
-    return (
-      <div className="min-h-[100dvh] flex flex-col items-center justify-center gap-4 bg-[#020617] p-4 text-white isolate">
-        <h2 className="text-3xl font-bold italic">Session Ended</h2>
-        <button onClick={() => window.location.href = "/"} className="px-8 h-12 bg-primary text-black font-black uppercase rounded-xl touch-manipulation">Back Home</button>
-      </div>
-    );
-  }
 
   useEffect(() => {
-    if (session && socket && session.hostId === socket.id) {
+    if (session && userId && session.hostId === userId) {
       safeNavigate(`/host/session/${sessionId}?name=${encodeURIComponent(userName)}`);
     }
-  }, [session, socket, sessionId, userName, safeNavigate]);
+  }, [session, userId, sessionId, userName, safeNavigate]);
 
-  if (!userName) return <NameEntry sessionId={sessionId} onJoin={setUserName} />;
+  // Show NameEntry if no name is set OR if the user is kicked/banned
+  if (!userName || isKicked) {
+    return <NameEntry sessionId={sessionId} onJoin={setUserName} error={error} />;
+  }
 
   if (!isConnected || !session) {
     return (

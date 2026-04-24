@@ -9,7 +9,7 @@ import { useSocket } from "@/components/providers/SocketProvider";
 import {
   GraduationCap, BookOpen, Gamepad2, Scale,
   ChevronRight, HelpCircle, Zap, User, MonitorSmartphone, ShieldCheck,
-  Crown, X, Settings, UsersRound, Volume2, VolumeX, StopCircle, Network, BrainCircuit, Swords, Loader2
+  Crown, X, Settings, UsersRound, Volume2, VolumeX, StopCircle, Network, BrainCircuit, Swords, Loader2, Sparkles, Users, UserMinus
 } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { motion, AnimatePresence } from "framer-motion";
@@ -31,8 +31,9 @@ import { CourtroomHost } from "@/components/activities/CourtroomMode";
 import { DuelDebateHost } from "@/components/activities/DuelDebate";
 import { DecisionEngineHost } from "@/components/activities/DecisionEngine";
 import { SessionControls } from "@/components/session/SessionControls";
+import { SessionFloatingController } from "@/components/session/SessionFloatingController";
 
-import Antakshari from "@/components/activities/Antakshari";
+
 import RMCSGame from "@/components/activities/RMCSGame";
 
 const QRCodeSVG = dynamic(() => import("qrcode.react").then((m) => m.QRCodeSVG), {
@@ -57,7 +58,7 @@ const ACTIVITIES = {
     { id: "trivia",    label: "Trivia Night",    desc: "Challenge your group with fast-paced general knowledge.", icon: Gamepad2, image: "/games/trivia.jpg" },
     { id: "wordchain", label: "Word Chain",      desc: "A fast-thinking vocabulary game for the whole team.", icon: Gamepad2, image: "/games/wordchain.jpg" },
     { id: "mostlikely",label: "Most Likely To",  desc: "Discover what your friends really think with fun group votes.", icon: Gamepad2, image: "/games/mostlikely.jpg" },
-    { id: "antakshari",label: "Antakshari",      desc: "Voice-first singing battle. Showcase your talent!", icon: Gamepad2, image: "/games/antakshari.jpg" },
+
     { id: "rmcs",      label: "RMCS Royale",     desc: "Raja Mantri Chor Sipahi - The classic social deduction game.", icon: Gamepad2, image: "/games/rmcs.jpg" },
     { id: "uno",       label: "UNO Cards",       desc: "The classic card game experience, now fully real-time.", icon: Gamepad2, image: "/games/uno.jpg" },
     { id: "ludo",      label: "Ludo Royale",     desc: "A premium, high-fidelity board game for up to 4 players.", icon: Gamepad2, image: "/games/ludo.jpg" },
@@ -126,9 +127,10 @@ function HostSessionContent() {
   const hostName = searchParams.get("name") || "Host";
 
   const { socket } = useSocket();
-  const { session, startActivity, updateActivity, endActivity, isConnected } = useSession(sessionId, hostName, "host");
+  const { session, userId, startActivity, updateActivity, endActivity, isConnected } = useSession(sessionId, hostName, "host");
   const [inviteOpen, setInviteOpen] = useState(false);
   const [isRedirecting, setIsRedirecting] = useState(false);
+  const [showParticipants, setShowParticipants] = useState(false);
   const [activeCategory, setActiveCategory] = useState<keyof typeof ACTIVITIES>("classroom");
   const [showSidebar, setShowSidebar] = useState(false);
   const [isMuted, setIsMuted] = useState(false);
@@ -153,10 +155,10 @@ function HostSessionContent() {
   }, [isRedirecting]);
 
   useEffect(() => {
-    if (session && socket && session.hostId !== socket.id) {
+    if (session && userId && session.hostId !== userId) {
       safeNavigate(`/session/${sessionId}?name=${encodeURIComponent(hostName)}`);
     }
-  }, [session, socket, sessionId, hostName, safeNavigate]);
+  }, [session, userId, sessionId, hostName, safeNavigate]);
 
   const isLive = session?.status === "live" || (session?.status === "waiting" && session?.mode !== "lobby");
   const currentMode = session?.mode ?? "lobby";
@@ -188,42 +190,103 @@ function HostSessionContent() {
       )}
       
       {/* Premium Header */}
-      <header className="h-20 border-b border-white/5 flex items-center justify-between px-8 shrink-0 bg-[#0A0D14]/40 premium-blur z-[100] relative">
-        <div className="absolute inset-x-0 bottom-0 h-px bg-gradient-to-r from-transparent via-primary/20 to-transparent" />
-        
-        <div className="flex items-center gap-6">
-          <div className="relative w-36 h-10 transition-transform duration-500 hover:scale-105">
-            <Image 
-              src="/logo.png" 
-              alt="CoAct Logo" 
-              fill
-              sizes="(max-width: 768px) 144px, 160px"
-              className="object-contain"
-              priority
-            />
+      {!(currentMode === 'board' || currentMode === 'thoughtmap') && (
+        <header className="h-20 border-b border-white/5 flex items-center justify-between px-8 shrink-0 bg-[#0A0D14]/40 premium-blur z-[100] relative">
+          <div className="absolute inset-x-0 bottom-0 h-px bg-gradient-to-r from-transparent via-primary/20 to-transparent" />
+          
+          <div className="flex items-center gap-6">
+            <div className="relative w-36 h-10 transition-transform duration-500 hover:scale-105">
+              <Image 
+                src="/logo.png" 
+                alt="CoAct Logo" 
+                fill
+                sizes="(max-width: 768px) 144px, 160px"
+                className="object-contain"
+                priority
+              />
+            </div>
+            <div className="h-6 w-px bg-white/10" />
+            <div className="flex items-center gap-3 bg-white/5 px-4 py-2 rounded-full border border-white/10 group cursor-default">
+              <span className="text-[10px] font-black text-white/30 uppercase tracking-[0.2em] group-hover:text-primary transition-colors">Session ID</span>
+              <span className="font-mono text-sm font-black text-primary uppercase tracking-widest">{sessionId}</span>
+            </div>
           </div>
-          <div className="h-6 w-px bg-white/10" />
-          <div className="flex items-center gap-3 bg-white/5 px-4 py-2 rounded-full border border-white/10 group cursor-default">
-            <span className="text-[10px] font-black text-white/30 uppercase tracking-[0.2em] group-hover:text-primary transition-colors">Session ID</span>
-            <span className="font-mono text-sm font-black text-primary uppercase tracking-widest">{sessionId}</span>
-          </div>
-        </div>
 
-        <div className="flex items-center gap-6">
-          <div className="flex items-center gap-8">
-            <div className="flex flex-col items-end">
-              <span className="text-[10px] font-black text-white/30 uppercase tracking-[0.2em]">Participants</span>
-              <div className="flex items-center gap-2 mt-0.5">
-                <div className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse shadow-[0_0_10px_rgba(34,197,94,0.5)]" />
-                <span className="text-sm font-black text-white">{joinedCount} Online</span>
+          <div className="flex items-center gap-6">
+            <div className="flex items-center gap-8">
+              <div 
+                className="relative"
+              >
+                <div
+                  onClick={() => setShowParticipants(!showParticipants)}
+                  className={`flex flex-col items-end transition-all duration-300 hover:scale-105 active:scale-95 group cursor-pointer ${showParticipants ? 'text-primary' : ''}`}
+                >
+                  <span className="text-[10px] font-black text-white/30 uppercase tracking-[0.2em] group-hover:text-primary/70 transition-colors">Participants</span>
+                  <div className="flex items-center gap-2 mt-0.5">
+                    <div className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse shadow-[0_0_10px_rgba(34,197,94,0.5)]" />
+                    <span className="text-sm font-black text-white group-hover:text-primary transition-colors">{joinedCount} Online</span>
+                  </div>
+                </div>
+
+                {/* Navbar Participant Popover */}
+                <AnimatePresence>
+                  {showParticipants && (
+                    <motion.div
+                      initial={{ opacity: 0, y: 10, scale: 0.95 }}
+                      animate={{ opacity: 1, y: 0, scale: 1 }}
+                      exit={{ opacity: 0, y: 10, scale: 0.95 }}
+                      className="absolute top-full right-0 mt-4 w-72 bg-[#0A0D14]/95 backdrop-blur-2xl border border-white/10 rounded-2xl shadow-[0_20px_50px_rgba(0,0,0,0.5)] z-[200] overflow-hidden"
+                    >
+                      <div className="p-4 border-b border-white/5 flex items-center justify-between">
+                        <span className="text-xs font-black uppercase tracking-widest text-white/40">Manage Participants</span>
+                        <Users className="w-4 h-4 text-primary" />
+                      </div>
+                      <div className="max-h-[300px] overflow-y-auto p-2 space-y-1 custom-scrollbar">
+                        <div className="flex items-center gap-3 p-2 rounded-xl bg-white/5 border border-white/5">
+                          <div className="w-8 h-8 rounded-full bg-primary flex items-center justify-center text-xs font-black text-black">
+                            {hostName.charAt(0).toUpperCase()}
+                          </div>
+                          <span className="text-xs font-bold text-white">You (Host)</span>
+                        </div>
+                        {participants.filter(p => p.role !== 'host').map(p => (
+                          <div key={p.id} className="flex items-center justify-between p-2 rounded-xl hover:bg-white/5 transition-colors group">
+                            <div className="flex items-center gap-3">
+                              <div className="w-8 h-8 rounded-full bg-[#1A1F2E] flex items-center justify-center text-xs font-bold text-white/70 relative border border-white/5">
+                                {p.name.charAt(0).toUpperCase()}
+                                <div className={`absolute -bottom-0.5 -right-0.5 w-2 h-2 rounded-full border border-[#0A0D14] ${p.isConnected ? 'bg-green-500' : 'bg-red-500'}`} />
+                              </div>
+                              <span className={`text-xs font-medium ${p.isConnected ? 'text-white/80' : 'text-white/30'}`}>{p.name}</span>
+                            </div>
+                            <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                              <button 
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  if (confirm(`Kick ${p.name}?`)) socket?.emit("mod:kick", { sessionId, targetUserId: p.userId });
+                                }}
+                                className="p-1.5 rounded-lg hover:bg-red-500/20 text-red-400 transition-colors"
+                              >
+                                <UserMinus className="w-3.5 h-3.5" />
+                              </button>
+                            </div>
+                          </div>
+                        ))}
+                        {participants.length <= 1 && (
+                          <div className="py-8 text-center">
+                            <p className="text-xs text-white/20 font-medium tracking-wide">Waiting for others to join...</p>
+                          </div>
+                        )}
+                      </div>
+                    </motion.div>
+                  )}
+                </AnimatePresence>
+              </div>
+              <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-primary to-blue-600 flex items-center justify-center text-sm font-black text-black shadow-lg shadow-primary/10 transition-transform hover:rotate-6">
+                {hostName.charAt(0).toUpperCase()}
               </div>
             </div>
-            <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-primary to-blue-600 flex items-center justify-center text-sm font-black text-black shadow-lg shadow-primary/10">
-              {hostName.charAt(0).toUpperCase()}
-            </div>
           </div>
-        </div>
-      </header>
+        </header>
+      )}
 
       {/* Sticky Sidebar Trigger */}
       <motion.button
@@ -256,7 +319,7 @@ function HostSessionContent() {
                 animate={{ x: 0 }}
                 exit={{ x: -400 }}
                 transition={{ type: "spring", damping: 30, stiffness: 300 }}
-                className="fixed lg:relative left-0 top-0 bottom-0 z-[120] w-[360px] bg-[#0A0D14]/90 premium-blur border-r border-white/5 p-6 flex flex-col gap-6 shadow-2xl overflow-hidden"
+                className="fixed lg:relative left-0 top-0 bottom-0 z-[120] w-[360px] bg-[#0A0D14]/90 premium-blur border-r border-white/5 p-6 flex flex-col gap-6 shadow-2xl overflow-y-auto custom-scrollbar"
               >
                 <div className="flex items-center justify-between mb-2">
                   <span className="text-xs font-black text-white/40 uppercase tracking-[0.2em]">Live Session</span>
@@ -293,34 +356,9 @@ function HostSessionContent() {
                   </div>
                 </div>
 
-                <div className="flex-1 bg-white/5 border border-white/10 rounded-2xl p-4 flex flex-col overflow-hidden">
-                  <h3 className="text-sm text-white/60 mb-4 flex items-center justify-between font-bold">
-                    <span>Participants</span>
-                    <span className="text-xs text-primary bg-primary/10 px-2 py-0.5 rounded-full">{joinedCount}</span>
-                  </h3>
-                  <div className="flex-1 overflow-y-auto space-y-3 pr-2 scrollbar-thin scrollbar-thumb-white/10">
-                    <div className="flex items-center gap-3 bg-white/5 p-2 rounded-xl border border-white/5">
-                      <div className="w-8 h-8 rounded-full bg-primary flex items-center justify-center text-xs font-black text-black relative">
-                        {hostName.charAt(0).toUpperCase()}
-                        <div className="absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 bg-green-500 rounded-full border-2 border-[#0A0D14]" />
-                      </div>
-                      <span className="text-xs font-bold text-white tracking-wide">You (Host)</span>
-                    </div>
-                    {participants.filter(p => p.role !== 'host').map(p => (
-                      <div key={p.id} className="flex items-center justify-between group">
-                        <div className="flex items-center gap-3">
-                          <div className="w-8 h-8 rounded-full bg-[#1A1F2E] flex items-center justify-center text-xs font-bold text-white/70 relative border border-white/5">
-                            {p.name.charAt(0).toUpperCase()}
-                            <div className={`absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 rounded-full border-2 border-[#0A0D14] ${p.isConnected ? 'bg-green-500' : 'bg-red-500'}`} />
-                          </div>
-                          <span className={`text-xs font-medium ${p.isConnected ? 'text-white/80' : 'text-white/30'}`}>{p.name}</span>
-                        </div>
-                        <Settings className="w-3.5 h-3.5 text-white/20 opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer hover:text-white" />
-                      </div>
-                    ))}
-                  </div>
+                <div className="flex-1" />
                   
-                  <div className="mt-4 pt-4 border-t border-white/10 flex flex-col gap-3 shrink-0">
+                  <div className="mt-4 pt-4 border-t border-white/10 flex flex-col gap-3 shrink-0 pb-10">
                     <button 
                       className="w-full flex items-center justify-center gap-2 py-3 rounded-xl border border-red-500/20 text-red-400 hover:bg-red-500 hover:text-white hover:border-red-500 transition-all shadow-[0_4px_20px_rgba(239,68,68,0.1)]" 
                       onClick={() => { endActivity(); window.location.href = "/"; }}
@@ -352,7 +390,6 @@ function HostSessionContent() {
                       </button>
                     </div>
                   </div>
-                </div>
               </motion.aside>
             </>
           )}
@@ -362,7 +399,7 @@ function HostSessionContent() {
         <main className={`flex-1 relative flex flex-col min-h-0 ${isLive ? "" : "overflow-y-auto"}`}>
           {isLive && socket ? (
             <div className={`w-full h-full flex-1 relative ${
-              currentMode === "board" || currentMode === "thoughtmap" ? "overflow-hidden" : "overflow-y-auto custom-scrollbar"
+              currentMode === "board" || currentMode === "thoughtmap" || currentMode === "uno" ? "overflow-hidden" : "overflow-y-auto custom-scrollbar"
             }`}>
               {currentMode === "board" ? <ThinkingBoard socket={socket} sessionId={sessionId} userName={hostName} session={session} isHost={true} /> :
               currentMode === "poll" ? <LivePollHost session={session} updateActivity={updateActivity} /> :
@@ -380,7 +417,7 @@ function HostSessionContent() {
               currentMode === "courtroom" ? <CourtroomHost session={session} updateActivity={updateActivity} /> :
               currentMode === "duel" ? <DuelDebateHost session={session} socket={socket} updateActivity={updateActivity} /> :
               currentMode === "decision" ? <DecisionEngineHost session={session} updateActivity={updateActivity} /> :
-              currentMode === "antakshari" ? <Antakshari session={session} socket={socket} userName={hostName} isHost={true} /> :
+
               currentMode === "rmcs" ? <RMCSGame session={session} socket={socket} userName={hostName} isHost={true} /> :
               null}
             </div>
@@ -495,7 +532,7 @@ function HostSessionContent() {
                           animate={{ opacity: 1, scale: 1 }}
                           className={`group cursor-pointer transition-all duration-300 hover:-translate-y-2`} 
                           onClick={() => {
-                            const needsSetup = ["poll", "quiz", "qa", "fitb", "trivia", "wordchain", "mostlikely", "study", "uno", "ludo", "thoughtmap", "courtroom", "duel", "decision", "antakshari", "rmcs"];
+                            const needsSetup = ["poll", "quiz", "qa", "fitb", "trivia", "wordchain", "mostlikely", "study", "uno", "ludo", "thoughtmap", "courtroom", "duel", "decision", "rmcs"];
                             startActivity(act.id as never, {}, needsSetup.includes(act.id) ? "waiting" : "live");
                           }}
                         >
@@ -613,6 +650,19 @@ function HostSessionContent() {
       </div>
 
       <InvitePanel sessionId={sessionId} open={inviteOpen} onClose={() => setInviteOpen(false)} />
+      <AnimatePresence>
+        {isLive && (
+          <SessionFloatingController 
+            isHost={true}
+            onExitActivity={() => startActivity("lobby" as any)}
+            onEndSession={() => { socket?.emit("session:end", { sessionId }); window.location.href = "/"; }}
+            onToggleMic={() => setIsMuted(!isMuted)}
+            isMicMuted={isMuted}
+            onOpenChat={() => alert("Chat Panel Coming Soon!")}
+            onOpenModeration={() => setShowSidebar(true)}
+          />
+        )}
+      </AnimatePresence>
     </div>
   );
 }

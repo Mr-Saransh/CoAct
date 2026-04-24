@@ -4,6 +4,7 @@ import { Input } from "@/components/ui/input";
 import { Card, CardContent } from "@/components/ui/card";
 import { Play, Link2, RotateCcw, CheckCircle2, AlertCircle, Loader2, Timer } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
+import { WinnerScreen } from "./WinnerScreen";
 
 const validateWord = async (word: string) => {
   try {
@@ -105,6 +106,15 @@ export function WordChainHost({ session, socket, userName }: { session: any; soc
 
   const [word, setWord] = useState("");
   const [isValidating, setIsValidating] = useState(false);
+  const [submitError, setSubmitError] = useState<string | null>(null);
+
+  // Listen for server-side word chain errors
+  useEffect(() => {
+    if (!socket) return;
+    const onError = (data: any) => { setSubmitError(data.message); setTimeout(() => setSubmitError(null), 3000); };
+    socket.on("wordchain:error", onError);
+    return () => { socket.off("wordchain:error", onError); };
+  }, [socket]);
 
   const handleStart = () => {
     socket.emit("wordchain:start", { sessionId: session.id });
@@ -112,6 +122,10 @@ export function WordChainHost({ session, socket, userName }: { session: any; soc
 
   const handleReset = () => {
     socket.emit("wordchain:reset", { sessionId: session.id });
+  };
+
+  const handleEnd = () => {
+    socket.emit("wordchain:end", { sessionId: session.id });
   };
 
   if (isEditing) {
@@ -153,6 +167,13 @@ export function WordChainHost({ session, socket, userName }: { session: any; soc
       return;
     }
 
+    // Client-side duplicate check
+    if (words.some((w: any) => w.word.toLowerCase() === trimmed)) {
+      setSubmitError(`"${trimmed}" has already been used!`);
+      setTimeout(() => setSubmitError(null), 3000);
+      return;
+    }
+
     setIsValidating(true);
     const isValid = await validateWord(trimmed);
     setIsValidating(false);
@@ -166,6 +187,18 @@ export function WordChainHost({ session, socket, userName }: { session: any; soc
     setWord("");
   };
 
+  if (activityData.status === "ended") {
+    return (
+      <WinnerScreen 
+        winnerName={activityData.winner}
+        rankings={activityData.rankings}
+        onReturnToLobby={() => socket.emit("wordchain:reset", { sessionId: session.id })}
+        isCurrentUserWinner={activityData.winner === userName}
+        gameName="Word Chain"
+      />
+    );
+  }
+
   return (
     <div className="p-8 h-full flex flex-col max-w-5xl mx-auto w-full text-center relative">
       <div className="mb-6">
@@ -177,6 +210,16 @@ export function WordChainHost({ session, socket, userName }: { session: any; soc
             <>Waiting for <strong className="text-white">{currentTurn}</strong></>
           )}
         </div>
+        
+        {activityData.scores && Object.keys(activityData.scores).length > 0 && (
+          <div className="mt-4 flex flex-wrap justify-center gap-2">
+            {Object.entries(activityData.scores).sort((a: any, b: any) => b[1] - a[1]).map(([name, score]: [string, any]) => (
+              <span key={name} className="px-3 py-1 bg-white/5 border border-white/10 rounded-full text-xs font-bold text-white/70">
+                {name}: <span className="text-white">{score} pts</span>
+              </span>
+            ))}
+          </div>
+        )}
       </div>
 
       <div className="flex-1 grid grid-cols-1 md:grid-cols-2 gap-8 min-h-0">
@@ -221,9 +264,12 @@ export function WordChainHost({ session, socket, userName }: { session: any; soc
             </Card>
           )}
 
-          <div className="mt-auto">
+          <div className="mt-auto grid grid-cols-2 gap-2">
+            <Button onClick={handleEnd} variant="outline" className="w-full bg-white/5 border-white/10 hover:bg-white/10 h-12">
+              End Game
+            </Button>
             <Button onClick={handleReset} variant="destructive" className="w-full bg-red-500/10 text-red-400 hover:bg-red-500/20 border-red-500/20 h-12">
-              <RotateCcw className="w-4 h-4 mr-2" /> Reset Game
+              <RotateCcw className="w-4 h-4 mr-2" /> Reset
             </Button>
           </div>
         </div>
@@ -237,6 +283,14 @@ export function WordChainParticipant({ session, socket, userName }: { session: a
   const activityData = session.activityData || {};
   const [word, setWord] = useState("");
   const [isValidating, setIsValidating] = useState(false);
+  const [submitError, setSubmitError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!socket) return;
+    const onError = (data: any) => { setSubmitError(data.message); setTimeout(() => setSubmitError(null), 3000); };
+    socket.on("wordchain:error", onError);
+    return () => { socket.off("wordchain:error", onError); };
+  }, [socket]);
   
   const isSpectator = session.spectators.includes(userName);
 
@@ -267,6 +321,13 @@ export function WordChainParticipant({ session, socket, userName }: { session: a
       return;
     }
 
+    // Client-side duplicate check
+    if (words.some((w: any) => w.word.toLowerCase() === trimmed)) {
+      setSubmitError(`"${trimmed}" has already been used!`);
+      setTimeout(() => setSubmitError(null), 3000);
+      return;
+    }
+
     setIsValidating(true);
     const isValid = await validateWord(trimmed);
     setIsValidating(false);
@@ -280,9 +341,32 @@ export function WordChainParticipant({ session, socket, userName }: { session: a
     setWord("");
   };
 
+  if (activityData.status === "ended") {
+    return (
+      <WinnerScreen 
+        winnerName={activityData.winner}
+        rankings={activityData.rankings}
+        onReturnToLobby={() => {}} // Only host resets
+        isCurrentUserWinner={activityData.winner === userName}
+        gameName="Word Chain"
+      />
+    );
+  }
+
   return (
     <div className="w-full max-w-5xl mx-auto flex flex-col h-[80vh] md:h-[70vh]">
-      <h2 className="text-3xl font-outfit font-bold mb-8 text-primary text-center">Word Chain</h2>
+      <div className="text-center mb-8">
+        <h2 className="text-3xl font-outfit font-bold text-primary mb-2">Word Chain</h2>
+        {activityData.scores && Object.keys(activityData.scores).length > 0 && (
+          <div className="mt-2 flex flex-wrap justify-center gap-2">
+            {Object.entries(activityData.scores).sort((a: any, b: any) => b[1] - a[1]).map(([name, score]: [string, any]) => (
+              <span key={name} className="px-3 py-1 bg-white/5 border border-white/10 rounded-full text-xs font-bold text-white/70">
+                {name}: <span className="text-white">{score} pts</span>
+              </span>
+            ))}
+          </div>
+        )}
+      </div>
 
       <div className="flex-1 grid grid-cols-1 md:grid-cols-2 gap-8 min-h-0">
         <ChainHistory words={words} />

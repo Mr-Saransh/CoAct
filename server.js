@@ -7,7 +7,7 @@ const dev = process.env.NODE_ENV !== 'production'
 const hostname = '0.0.0.0'
 const server = createServer()
 const path = require('path')
-const app = next({ dev, dir: __dirname, hostname, port, webpack: true })
+const app = next({ dev, hostname, port })
 const handle = app.getRequestHandler()
 
 
@@ -205,6 +205,13 @@ app.prepare().then(() => {
         livePermission: 'all', // all | host | selected
         allowedUsers: [],
         elements: [],
+        defaultPermissions: {
+          draw: true,
+          erase: true,
+          type: true,
+          move: true
+        },
+        userPermissions: {}
       }
     }
     return session.activityData.board
@@ -214,153 +221,22 @@ app.prepare().then(() => {
     return Array.isArray(session.spectators) && session.spectators.includes(userName)
   }
 
-  function canDrawLive(session, board, userName, socketId) {
+  function canDrawLive(session, board, userName, userId) {
     if (isSpectator(session, userName)) return false
     if (board.livePermission === 'all') return true
-    if (board.livePermission === 'host') return session.hostId === socketId
+    if (board.livePermission === 'host') return session.hostId === userId
     if (board.livePermission === 'selected') {
-      return session.hostId === socketId || (Array.isArray(board.allowedUsers) && board.allowedUsers.includes(userName))
+      return session.hostId === userId || (Array.isArray(board.allowedUsers) && board.allowedUsers.includes(userName))
     }
     return false
   }
 
   io.on('connection', (socket) => {
     // ==========================================
-    // ANTAKSHARI & RMCS GLOBAL LISTENERS
-    // ==========================================
-    socket.on('antakshari:ping', () => {
-      socket.emit('antakshari:pong', { time: Date.now(), socketId: socket.id });
-    });
-
-    socket.on('antakshari:join_team', ({ sessionId, team, targetName }) => {
-      const sId = sessionId || socket.data.sessionId;
-      console.log(`[antakshari] join_team → sess:${sId} team:${team} target:${targetName}`);
-      const session = sessions.get(sId);
-      if (!session) return;
-      
-      const name = targetName || socket.data.name || session.participants.find(p => p.id === socket.id)?.name;
-      if (!name) return;
-
-      if (!session.activityData) session.activityData = {};
-      if (!session.activityData.teams) session.activityData.teams = { A: [], B: [], solo: [] };
-
-      const teams = session.activityData.teams;
-      teams.A = (teams.A || []).filter(n => n !== name);
-      teams.B = (teams.B || []).filter(n => n !== name);
-      teams.solo = (teams.solo || []).filter(n => n !== name);
-
-      if (team === 'A') teams.A.push(name);
-      else if (team === 'B') teams.B.push(name);
-      else teams.solo.push(name);
-
-      broadcastState(sId);
-      socket.emit('session:state', session); // Direct echo for instant feedback
-    });
-
-    socket.on('antakshari:start', ({ sessionId, gameMode }) => {
-      const sId = sessionId || socket.data.sessionId;
-      console.log(`[antakshari] start_arena → sess:${sId} mode:${gameMode}`);
-      const session = sessions.get(sId);
-      if (!session) return;
-
-      const teams = session.activityData.teams || { A: [], B: [], solo: [] };
-      const assignedNames = [...(teams.A || []), ...(teams.B || []), ...(teams.solo || [])];
-      
-      let participants = session.participants.filter(p => 
-        p.isConnected && (assignedNames.includes(p.name) || p.role === 'host' || session.players.includes(p.name))
-      );
-
-      if (participants.length === 0) participants = session.participants.filter(p => p.isConnected);
-
-      console.log(`[antakshari] Starting with ${participants.length} players`);
-
-      session.mode = 'antakshari';
-      session.status = 'live';
-      
-      session.activityData = {
-        gameMode: gameMode || 'solo',
-        players: participants.map(p => ({ 
-          name: p.name, 
-          score: 0, 
-          team: (teams.A || []).includes(p.name) ? 'A' : ((teams.B || []).includes(p.name) ? 'B' : 'solo') 
-        })),
-        teams: teams,
-        turnIndex: 0,
-        currentLetter: "A",
-        history: [],
-        phase: 'singing',
-        timer: 15,
-      };
-
-      const firstPlayer = session.activityData.players[0]?.name;
-      if (firstPlayer) {
-        session.participants.forEach(p => {
-          if (p.role !== 'host') {
-            p.mutedByHost = (p.name !== firstPlayer);
-            if (p.mutedByHost) p.micOn = false;
-          }
-        });
-      }
-
-      broadcastState(sId);
-      socket.emit('session:state', session);
-    });
-
-    socket.on('antakshari:submit', ({ sessionId, text, nextLetter }) => {
-      const sId = sessionId || socket.data.sessionId;
-      console.log(`[antakshari] submission → sess:${sId} text:${text}`);
-      const session = sessions.get(sId);
-      if (!session || !session.activityData.players) return;
-      
-      const data = session.activityData;
-      const currentPlayer = data.players[data.turnIndex];
-      
-      data.players[data.turnIndex].score += 10;
-      data.history.push({ text, author: currentPlayer.name, letter: data.currentLetter });
-      data.currentLetter = nextLetter || "A";
-      data.turnIndex = (data.turnIndex + 1) % data.players.length;
-
-      const nextSinger = data.players[data.turnIndex]?.name;
-      session.participants.forEach(p => {
-        if (p.role !== 'host') {
-          p.mutedByHost = (p.name !== nextSinger);
-          if (p.mutedByHost) p.micOn = false;
-        }
-      });
-
-      broadcastState(sId);
-      socket.emit('session:state', session);
-    });
-
-    socket.on('antakshari:fail', ({ sessionId }) => {
-      const sId = sessionId || socket.data.sessionId;
-      console.log(`[antakshari] turn_fail → sess:${sId}`);
-      const session = sessions.get(sId);
-      if (!session || !session.activityData.players) return;
-
-      const data = session.activityData;
-      const currentPlayer = data.players[data.turnIndex];
-
-      if (data.gameMode === 'teams') {
-        const otherTeam = currentPlayer.team === 'A' ? 'B' : 'A';
-        data.players.forEach(p => { if (p.team === otherTeam) p.score += 5; });
-      }
-
-      data.turnIndex = (data.turnIndex + 1) % data.players.length;
-      const nextSinger = data.players[data.turnIndex]?.name;
-      session.participants.forEach(p => {
-        if (p.role !== 'host') {
-          p.mutedByHost = (p.name !== nextSinger);
-          if (p.mutedByHost) p.micOn = false;
-        }
-      });
-
-      broadcastState(sId);
-      socket.emit('session:state', session);
-    });
+    // RMCS GLOBAL LISTENERS
     // ==========================================
 
-    socket.on('session:join', ({ sessionId, name, role }) => {
+    socket.on('session:join', ({ sessionId, name, role, userId: providedUserId }) => {
       if (!sessionId || !name) {
         socket.emit('session:error', { message: 'Missing sessionId or name' })
         return
@@ -372,12 +248,14 @@ app.prepare().then(() => {
         if (!session) {
           session = {
             id: sessionId,
-            hostId: socket.id,
+            hostId: null, // Durable Host User ID (set on first join)
             hostName: name,
+            hostStatus: 'active',
             mode: 'lobby',
             status: 'waiting',
             activityData: {},
             participants: [],
+            bannedParticipants: [], // Durable userIds
             players: [], // Active players
             spectators: [], // View-only participants
             maxPlayers: 4, // Default max players
@@ -387,9 +265,6 @@ app.prepare().then(() => {
           }
           sessions.set(sessionId, session)
           console.log(`  ★ session ${sessionId} created by ${name}`)
-        } else {
-          session.hostId = socket.id
-          session.hostName = name
         }
       }
 
@@ -398,17 +273,50 @@ app.prepare().then(() => {
         return
       }
 
-      let existingP = session.participants.find(p => p.name === name)
+      // 1) DURABLE IDENTITY
+      const userId = providedUserId || socket.id // Client should pass userId
+      
+      // 2) BAN CHECK
+      if (session.bannedParticipants.includes(userId)) {
+        socket.emit('session:error', { message: 'You have been banned from this session.' })
+        return
+      }
+
+      // 3) HOST PERSISTENCE
+      if (role === 'host') {
+        if (!session.hostId) {
+          session.hostId = userId
+          session.hostName = name
+          session.hostStatus = 'active'
+        } else if (session.hostId !== userId) {
+          // Someone else trying to join as host? 
+          // If they have a different userId, they become a participant unless they are promoted.
+          // For coAct, we might want to just block them or force participant.
+          console.log(`  ⚠ ${name} (${userId}) tried to join as host but ${session.hostName} (${session.hostId}) is the owner.`)
+          socket.emit('session:error', { message: 'This session already has an owner. You will join as a participant.' })
+          // We can let them proceed as participant below
+        } else {
+          // Original host returning
+          session.hostStatus = 'active'
+          session.hostName = name
+        }
+      }
+
+      let existingP = session.participants.find(p => p.userId === userId)
       if (existingP) {
         existingP.id = socket.id
-        existingP.role = role
-        existingP.joinedAt = Date.now()
+        existingP.name = name // update name if changed
         existingP.isConnected = true
+        // Ensure role is correct if they are the owner
+        if (session.hostId === userId) {
+          existingP.role = 'host'
+        }
       } else {
         session.participants.push({ 
           id: socket.id, 
+          userId,
           name, 
-          role, 
+          role: (role === 'host' && session.hostId === userId) ? 'host' : 'participant', 
           joinedAt: Date.now(),
           isConnected: true,
           micOn: false,
@@ -419,6 +327,7 @@ app.prepare().then(() => {
       socket.join(sessionId)
       // Tag socket so we can clean up on disconnect
       socket.data.sessionId = sessionId
+      socket.data.userId = userId
       socket.data.name = name
       socket.data.role = role
 
@@ -438,7 +347,7 @@ app.prepare().then(() => {
 
     socket.on('session:toggle_role', ({ sessionId, targetName }) => {
       const session = sessions.get(sessionId)
-      if (!session || session.hostId !== socket.id) return
+      if (!session || session.hostId !== socket.data.userId) return
       
       if (session.players.includes(targetName)) {
         // Player -> Spectator
@@ -456,7 +365,7 @@ app.prepare().then(() => {
 
     socket.on('session:set_max_players', ({ sessionId, count }) => {
       const session = sessions.get(sessionId)
-      if (!session || session.hostId !== socket.id) return
+      if (!session || session.hostId !== socket.data.userId) return
       session.maxPlayers = count
       // If we reduced max players, demote last players to spectators
       while (session.players.length > count) {
@@ -512,11 +421,12 @@ app.prepare().then(() => {
       const session = sessions.get(sessionId)
       if (!session) return
       
-      const targetUser = session.participants.find(p => p.id === targetUserId)
-      const currentHost = session.participants.find(p => p.id === session.hostId)
+      // targetUserId can be either socket.id or durable userId depending on client
+      const targetUser = session.participants.find(p => p.userId === targetUserId || p.id === targetUserId)
+      const currentHost = session.participants.find(p => p.userId === session.hostId)
       
       if (targetUser) {
-        session.hostId = targetUser.id
+        session.hostId = targetUser.userId
         session.hostName = targetUser.name
         targetUser.role = 'host'
         
@@ -531,7 +441,7 @@ app.prepare().then(() => {
 
     socket.on('board:set_config', ({ sessionId, mode, livePermission, allowedUsers }) => {
       const session = sessions.get(sessionId)
-      if (!session || session.mode !== 'board' || session.hostId !== socket.id) return
+      if (!session || session.mode !== 'board' || session.hostId !== socket.data.userId) return
       const board = ensureBoardState(session)
       if (mode === 'live' || mode === 'private') board.mode = mode
       if (livePermission === 'all' || livePermission === 'host' || livePermission === 'selected') {
@@ -548,7 +458,7 @@ app.prepare().then(() => {
       if (!userName) return
       const board = ensureBoardState(session)
       if (board.mode !== 'live') return
-      if (!canDrawLive(session, board, userName, socket.id)) return
+      if (!canDrawLive(session, board, userName, socket.data.userId)) return
       if (!Array.isArray(elements)) return
       board.elements = elements
       broadcastState(sessionId)
@@ -592,16 +502,25 @@ app.prepare().then(() => {
       }
     })
 
-    socket.on('quiz:answer', ({ sessionId, userName, answer }) => {
+    socket.on('quiz:answer', ({ sessionId, userName, answer, reactionTime }) => {
       const session = sessions.get(sessionId)
       if (!session || session.mode !== 'quiz') return
       
       const activityData = session.activityData
       if (!activityData.answers) activityData.answers = {}
       
-      if (activityData.answers[userName] === undefined) {
-        activityData.answers[userName] = answer
-        console.log(`  📝 ${userName} answered in quiz ${sessionId}`)
+      // Prevent multiple answers for the same question
+      if (activityData.answers[userName] === undefined && activityData.state === 'QUESTION_ACTIVE') {
+        const currentQ = activityData.questions[activityData.currentQuestionIndex]
+        const isCorrect = answer === currentQ.correct
+        
+        activityData.answers[userName] = {
+          answer,
+          isCorrect,
+          reactionTime: reactionTime || 0
+        }
+        
+        console.log(`  📝 ${userName} answered in quiz ${sessionId} (${reactionTime}ms)`)
         broadcastState(sessionId)
       }
     })
@@ -655,7 +574,7 @@ app.prepare().then(() => {
 
     socket.on('wordchain:start', ({ sessionId }) => {
       const session = sessions.get(sessionId)
-      if (!session || session.mode !== 'wordchain' || session.hostId !== socket.id) return
+      if (!session || session.mode !== 'wordchain' || session.hostId !== socket.data.userId) return
       
       const players = session.players || []
       if (players.length < 1) return
@@ -666,6 +585,7 @@ app.prepare().then(() => {
         participantOrder: players,
         currentTurnIndex: 0,
         words: [],
+        scores: {}, // Track player points
         turnDurationMs: 15000,
         turnEndsAt: Date.now() + 15000
       }
@@ -683,8 +603,22 @@ app.prepare().then(() => {
       const currentTurn = state.participantOrder[state.currentTurnIndex]
       if (currentTurn !== userName) return
 
-      state.words.push({ word, author: userName })
+      // Check for duplicate words (case-insensitive)
+      const lowerWord = word.toLowerCase().trim()
+      const alreadyUsed = state.words.some(w => w.word.toLowerCase() === lowerWord)
+      if (alreadyUsed) {
+        socket.emit('wordchain:error', { message: `"${word}" has already been used! Try a different word.` })
+        return
+      }
+
+      state.words.push({ word: lowerWord, author: userName })
       state.currentTurnIndex = (state.currentTurnIndex + 1) % state.participantOrder.length
+      
+      // Calculate score based on speed
+      const timeRemaining = Math.max(0, state.turnEndsAt - Date.now())
+      const points = 10 + Math.floor((timeRemaining / state.turnDurationMs) * 15)
+      if (!state.scores) state.scores = {}
+      state.scores[userName] = (state.scores[userName] || 0) + points
       
       startWordChainTimer(sessionId)
       broadcastState(sessionId)
@@ -692,7 +626,7 @@ app.prepare().then(() => {
 
     socket.on('wordchain:skip', ({ sessionId }) => {
       const session = sessions.get(sessionId)
-      if (!session || session.mode !== 'wordchain' || session.hostId !== socket.id) return
+      if (!session || session.mode !== 'wordchain' || session.hostId !== socket.data.userId) return
       const state = session.activityData
       if (!state || state.status !== 'live') return
 
@@ -703,14 +637,42 @@ app.prepare().then(() => {
 
     socket.on('wordchain:reset', ({ sessionId }) => {
       const session = sessions.get(sessionId)
-      if (!session || session.mode !== 'wordchain' || session.hostId !== socket.id) return
+      if (!session || session.mode !== 'wordchain' || session.hostId !== socket.data.userId) return
       clearWordChainTimer(sessionId)
       session.status = 'waiting'
       session.activityData = {
         participantOrder: [],
         currentTurnIndex: 0,
-        words: []
+        words: [],
+        scores: {}
       }
+      broadcastState(sessionId)
+    })
+
+    socket.on('wordchain:end', ({ sessionId }) => {
+      const session = sessions.get(sessionId)
+      if (!session || session.mode !== 'wordchain' || session.hostId !== socket.data.userId) return
+      const state = session.activityData
+      if (!state || state.status !== 'live') return
+
+      clearWordChainTimer(sessionId)
+      state.status = 'ended'
+      
+      // Calculate rankings
+      const scores = state.scores || {}
+      const players = state.participantOrder || []
+      // Include players with 0 points
+      players.forEach(p => { if (scores[p] === undefined) scores[p] = 0 })
+
+      const rankings = Object.keys(scores).map(name => ({
+        name,
+        score: scores[name]
+      })).sort((a, b) => b.score - a.score)
+
+      state.rankings = rankings
+      state.winner = rankings.length > 0 ? rankings[0].name : null
+
+      io.to(sessionId).emit('game_end', { winner: state.winner, rankings })
       broadcastState(sessionId)
     })
 
@@ -738,7 +700,7 @@ app.prepare().then(() => {
     socket.on('uno:start', ({ sessionId, cardsPerPlayer }) => {
       const session = sessions.get(sessionId)
       if (!session || session.mode !== 'uno') return
-      if (session.hostId !== socket.id) return
+      if (session.hostId !== socket.data.userId) return
       
       // Use the selected players list
       const players = session.participants.filter(p => p.isConnected && session.players.includes(p.name))
@@ -787,27 +749,26 @@ app.prepare().then(() => {
       const session = sessions.get(sessionId)
       if (!session || session.mode !== 'uno') return
       const state = session.activityData
-      if (!state || state.status !== 'live' || state.winner) return
+      if (!state || state.status !== 'live') return
       const user = socket.data.name
       if (!user || state.turn !== user) return
       if (state.hasDrawnThisTurn) return
+      // Check if user is still in the active order
+      if (!state.order.includes(user)) return
 
       const hand = state.players[user]?.cards || []
-      const hasPlayable = hand.some(c => isPlayable(c, state))
-      if (hasPlayable) return
-
+      // Draw is always allowed — no hasPlayable check
       const drawn = drawFromPile(state, 1)
       if (!drawn.length) return
       hand.push(drawn[0])
       state.hasDrawnThisTurn = true
       io.to(sessionId).emit('draw_card', { user, count: 1 })
 
-      if (!isPlayable(drawn[0], state)) {
-        state.hasDrawnThisTurn = false
-        io.to(sessionId).emit('next_turn', { from: user })
-        advanceTurn(state, 1)
-        startUnoTimer(sessionId)
-      }
+      // After drawing, auto-advance turn
+      state.hasDrawnThisTurn = false
+      io.to(sessionId).emit('next_turn', { from: user })
+      advanceTurn(state, 1)
+      startUnoTimer(sessionId)
       broadcastState(sessionId)
     })
 
@@ -836,10 +797,31 @@ app.prepare().then(() => {
       if (card.type === 'wild' || card.type === 'wild4') io.to(sessionId).emit('choose_color', { user, color: state.currentColor })
 
       if (hand.length === 0) {
-        state.winner = user
-        state.status = 'ended'
-        clearUnoTimer(sessionId)
-        io.to(sessionId).emit('game_end', { winner: user })
+        // Player finished — add to winners list and remove from active order
+        if (!state.winners) state.winners = []
+        state.winners.push(user)
+        io.to(sessionId).emit('uno:player_won', { winner: user, position: state.winners.length })
+
+        // Remove finished player from turn order
+        state.order = state.order.filter(n => n !== user)
+
+        // If only 1 player left, game is fully over
+        if (state.order.length <= 1) {
+          state.winner = state.winners[0] // First finisher is the winner
+          state.status = 'ended'
+          clearUnoTimer(sessionId)
+          io.to(sessionId).emit('game_end', { winner: state.winners[0], rankings: state.winners })
+          broadcastState(sessionId)
+          return
+        }
+
+        // Game continues for remaining players — advance turn
+        // Make sure turn index stays valid after removing player
+        const currentIdx = state.order.indexOf(state.turn)
+        if (currentIdx === -1) {
+          state.turn = state.order[0]
+        }
+        startUnoTimer(sessionId)
         broadcastState(sessionId)
         return
       }
@@ -879,7 +861,7 @@ app.prepare().then(() => {
     socket.on('ludo:start', ({ sessionId }) => {
       const session = sessions.get(sessionId)
       if (!session || session.mode !== 'ludo') return
-      if (session.hostId !== socket.id) return
+      if (session.hostId !== socket.data.userId) return
 
       // Use the selected players list
       const joined = session.participants.filter(p => p.isConnected && session.players.includes(p.name))
@@ -1040,7 +1022,7 @@ app.prepare().then(() => {
 
     socket.on('chat:pin', ({ sessionId, messageId, pinned }) => {
       const session = sessions.get(sessionId)
-      if (!session || session.hostId !== socket.id) return
+      if (!session || session.hostId !== socket.data.userId) return
       const msg = session.chatMessages.find(m => m.id === messageId)
       if (msg) {
         msg.pinned = pinned
@@ -1050,7 +1032,7 @@ app.prepare().then(() => {
 
     socket.on('mod:mute', ({ sessionId, targetName, isMuted }) => {
       const session = sessions.get(sessionId)
-      if (!session || session.hostId !== socket.id) return
+      if (!session || session.hostId !== socket.data.userId) return
       const target = session.participants.find(p => p.name === targetName)
       if (target) {
         target.mutedByHost = isMuted
@@ -1061,7 +1043,7 @@ app.prepare().then(() => {
 
     socket.on('mod:mute_all', ({ sessionId }) => {
       const session = sessions.get(sessionId)
-      if (!session || session.hostId !== socket.id) return
+      if (!session || session.hostId !== socket.data.userId) return
       session.participants.forEach(p => {
         if (p.role !== 'host') {
           p.mutedByHost = true
@@ -1073,7 +1055,7 @@ app.prepare().then(() => {
 
     socket.on('mod:unmute_all', ({ sessionId }) => {
       const session = sessions.get(sessionId)
-      if (!session || session.hostId !== socket.id) return
+      if (!session || session.hostId !== socket.data.userId) return
       session.participants.forEach(p => {
         if (p.role !== 'host') {
           p.mutedByHost = false
@@ -1086,7 +1068,7 @@ app.prepare().then(() => {
 
     socket.on('wordchain:start', ({ sessionId }) => {
       const session = sessions.get(sessionId)
-      if (!session || session.mode !== 'wordchain' || session.hostId !== socket.id) return
+      if (!session || session.mode !== 'wordchain' || session.hostId !== socket.data.userId) return
       
       const players = session.players || []
       if (players.length < 1) return
@@ -1123,7 +1105,7 @@ app.prepare().then(() => {
 
     socket.on('wordchain:skip', ({ sessionId }) => {
       const session = sessions.get(sessionId)
-      if (!session || session.mode !== 'wordchain' || session.hostId !== socket.id) return
+      if (!session || session.mode !== 'wordchain' || session.hostId !== socket.data.userId) return
       const state = session.activityData
       if (!state || state.status !== 'live') return
 
@@ -1134,7 +1116,7 @@ app.prepare().then(() => {
 
     socket.on('wordchain:reset', ({ sessionId }) => {
       const session = sessions.get(sessionId)
-      if (!session || session.mode !== 'wordchain' || session.hostId !== socket.id) return
+      if (!session || session.mode !== 'wordchain' || session.hostId !== socket.data.userId) return
       clearWordChainTimer(sessionId)
       session.status = 'waiting'
       session.activityData = {
@@ -1155,15 +1137,33 @@ app.prepare().then(() => {
       broadcastState(sessionId)
     })
 
-    socket.on('mod:kick', ({ sessionId, targetName }) => {
+    socket.on('mod:kick', ({ sessionId, targetUserId }) => {
       const session = sessions.get(sessionId)
-      if (!session || session.hostId !== socket.id) return
-      const target = session.participants.find(p => p.name === targetName)
+      if (!session || session.hostId !== socket.data.userId) return
+      
+      const target = session.participants.find(p => p.userId === targetUserId)
       if (target) {
-        io.to(target.id).emit('session:kicked')
-        session.participants = session.participants.filter(p => p.name !== targetName)
+        io.to(target.id).emit('session:kicked', { message: 'You have been banned from this session by the host.' })
+        if (!session.bannedParticipants.includes(targetUserId)) {
+          session.bannedParticipants.push(targetUserId)
+        }
+        // Disconnect their socket
+        const targetSocket = io.sockets.sockets.get(target.id)
+        if (targetSocket) targetSocket.leave(sessionId)
+        
+        target.isConnected = false
+        console.log(`  🚫 ${target.name} kicked and banned from ${sessionId}`)
         broadcastState(sessionId)
       }
+    })
+
+    socket.on('mod:unban', ({ sessionId, targetUserId }) => {
+      const session = sessions.get(sessionId)
+      if (!session || session.hostId !== socket.data.userId) return
+      
+      session.bannedParticipants = session.bannedParticipants.filter(id => id !== targetUserId)
+      console.log(`  🔓 User ${targetUserId} unbanned in ${sessionId}`)
+      broadcastState(sessionId)
     })
 
     socket.on('voice:toggle', ({ sessionId, userName, micOn }) => {
@@ -1240,7 +1240,7 @@ app.prepare().then(() => {
     // === DUEL DEBATE ATOMIC EVENTS ===
     socket.on('duel:assign_role', ({ sessionId, targetName, role }) => {
       const session = sessions.get(sessionId)
-      if (!session || session.mode !== 'duel' || session.hostId !== socket.id) return
+      if (!session || session.mode !== 'duel' || session.hostId !== socket.data.userId) return
       if (!session.activityData.roles) session.activityData.roles = {}
       session.activityData.roles[targetName] = role
       broadcastState(sessionId)
@@ -1257,7 +1257,7 @@ app.prepare().then(() => {
     // === COURTROOM ATOMIC EVENTS ===
     socket.on('courtroom:assign_role', ({ sessionId, targetName, role }) => {
       const session = sessions.get(sessionId)
-      if (!session || session.mode !== 'courtroom' || session.hostId !== socket.id) return
+      if (!session || session.mode !== 'courtroom' || session.hostId !== socket.data.userId) return
       if (!session.activityData.assignedRoles) session.activityData.assignedRoles = { judge: null, prosecution: [], defense: [] }
       const r = session.activityData.assignedRoles
       if (r.judge === targetName) r.judge = null
@@ -1280,7 +1280,7 @@ app.prepare().then(() => {
     // === RMCS ATOMIC EVENTS ===
     socket.on('rmcs:start', ({ sessionId }) => {
       const session = sessions.get(sessionId)
-      if (!session || session.hostId !== socket.id) return
+      if (!session || session.hostId !== socket.data.userId) return
       
       const players = session.participants.filter(p => p.isConnected && session.players.includes(p.name))
       if (players.length !== 4) return // RMCS is typically 4 players
@@ -1332,7 +1332,7 @@ app.prepare().then(() => {
 
     socket.on('rmcs:next_round', ({ sessionId }) => {
       const session = sessions.get(sessionId)
-      if (!session || session.mode !== 'rmcs' || session.hostId !== socket.id) return
+      if (!session || session.mode !== 'rmcs' || session.hostId !== socket.data.userId) return
       const data = session.activityData
 
       if (data.round >= data.totalRounds) {
@@ -1355,7 +1355,7 @@ app.prepare().then(() => {
     })
 
     socket.on('disconnect', () => {
-      const { sessionId, name, role } = socket.data
+      const { sessionId, userId, name } = socket.data
       if (!sessionId) return
       const session = sessions.get(sessionId)
       if (!session) return
@@ -1363,27 +1363,18 @@ app.prepare().then(() => {
       // Notify others about voice leave
       socket.to(sessionId).emit('voice:leave', socket.id)
 
-      const p = session.participants.find(p => p.id === socket.id)
+      const p = session.participants.find(p => p.userId === userId && p.id === socket.id)
       if (p) p.isConnected = false
 
-      if (session.hostId === socket.id) {
-        const nextHost = session.participants.find(p => p.isConnected && p.id !== socket.id)
-        if (nextHost) {
-          nextHost.role = 'host'
-          session.hostId = nextHost.id
-          session.hostName = nextHost.name
-          console.log(`👑 Host reassigned to ${nextHost.name} in ${sessionId}`)
-        }
+      if (session.hostId === userId) {
+        session.hostStatus = 'offline'
+        console.log(`  🏠 Host ${name} went offline in ${sessionId}`)
       }
 
-      // Remove from player/spectator lists if not reconnected within some time?
-      // Actually, keeping them in the lists is better for reconnection stability.
-      // But we should at least log it.
-      
       console.log(`  ✗ ${name} disconnected from ${sessionId}`)
 
-      const hasConnected = session.participants.some(p => p.isConnected)
-      if (!hasConnected) {
+      const hasAnyConnected = session.participants.some(p => p.isConnected)
+      if (!hasAnyConnected) {
         clearUnoTimer(sessionId)
         setTimeout(() => {
           const s = sessions.get(sessionId)
@@ -1391,15 +1382,16 @@ app.prepare().then(() => {
             sessions.delete(sessionId)
             console.log(`  ✗ session ${sessionId} deleted (empty timeout)`)
           }
-        }, 5 * 60 * 1000)
+        }, 10 * 60 * 1000) // 10 minutes grace for empty session
       } else {
         broadcastState(sessionId)
       }
     })
   })
 
-  server.listen(port, hostname, (err) => {
+  server.listen(port, '0.0.0.0', (err) => {
     if (err) throw err
     console.log(`> Ready on http://${hostname}:${port}`)
+    console.log(`> Network access: http://<your-ip>:${port}`)
   })
 })
