@@ -35,7 +35,7 @@ export function UnoBoard({ session, socket, userName }: { session: SessionLike; 
   const [isMobile, setIsMobile] = useState(false);
   useEffect(() => { const c = () => setIsMobile(window.innerWidth < 1024); c(); window.addEventListener("resize", c); return () => window.removeEventListener("resize", c); }, []);
 
-  useEffect(() => { setDrawLoading(false); }, [state.turn]);
+  useEffect(() => { setDrawLoading(false); }, [state.turn, state.hasDrawnThisTurn]);
 
   useEffect(() => {
     const onWon = (d: any) => { setPlayerWonName(d.winner); setTimeout(() => setPlayerWonName(null), 4000); };
@@ -62,6 +62,11 @@ export function UnoBoard({ session, socket, userName }: { session: SessionLike; 
     if (card.type === "wild" || card.type === "wild4") { setWildPickForId(card.id); return; }
     playCard(card);
   }, [isMyTurn, isSpectator, iFinished, playableSet, playCard]);
+
+  const passTurn = useCallback(() => {
+    if (!isMyTurn || isSpectator || iFinished || !state.hasDrawnThisTurn) return;
+    socket.emit("uno:pass", { sessionId: session.id });
+  }, [isMyTurn, isSpectator, iFinished, state.hasDrawnThisTurn, socket, session.id]);
 
   const scrollTray = (dir: number) => { trayRef.current?.scrollBy({ left: dir * 200, behavior: "smooth" }); };
   const currentColorMeta = COLOR_META[(state.currentColor || "red") as UnoCard["color"]];
@@ -99,10 +104,10 @@ export function UnoBoard({ session, socket, userName }: { session: SessionLike; 
       </div>
 
       {/* MAIN AREA */}
-      <div className="flex-1 min-h-0 flex flex-col lg:flex-row overflow-hidden">
+      <div className="flex-1 min-h-0 flex flex-col overflow-hidden relative">
         {/* Left sidebar (desktop) */}
         {!isMobile && (
-          <aside className="w-56 xl:w-64 shrink-0 border-r border-white/5 bg-black/20 p-4 flex flex-col gap-3 overflow-y-auto">
+          <aside className="fixed left-0 top-1/2 -translate-y-1/2 w-56 xl:w-64 z-[40] border-r border-white/5 bg-black/40 backdrop-blur-xl p-4 flex flex-col gap-3 overflow-y-auto rounded-r-3xl shadow-2xl max-h-[70vh]">
             <h3 className="text-[9px] font-black text-white/25 uppercase tracking-[0.2em] mb-1 flex items-center gap-2"><Users className="w-3 h-3" /> Players</h3>
             {(state.order || []).map((name) => {
               const count = state.players?.[name]?.cards?.length || 0;
@@ -145,8 +150,8 @@ export function UnoBoard({ session, socket, userName }: { session: SessionLike; 
             </div>
           )}
 
-          <div className="flex-1 min-h-0 flex items-center justify-center relative p-4">
-            <div className="flex items-center gap-6 md:gap-12 z-10">
+          <div className="flex-1 flex items-center justify-center relative p-4 overflow-hidden">
+            <div className="flex items-center justify-center gap-8 sm:gap-16 z-10 w-full max-w-md mx-auto">
               <div className="flex flex-col items-center gap-2">
                 <span className="text-[9px] font-black text-white/20 uppercase tracking-[0.2em]">Discard</span>
                 <AnimatePresence mode="wait">
@@ -159,12 +164,22 @@ export function UnoBoard({ session, socket, userName }: { session: SessionLike; 
               </div>
               <div className="flex flex-col items-center gap-2">
                 <span className="text-[9px] font-black text-white/20 uppercase tracking-[0.2em]">Draw</span>
-                <button onClick={drawCard} disabled={!isMyTurn || drawLoading || iFinished} className={`relative rounded-2xl h-28 w-[4.5rem] border-2 overflow-hidden transition-all ${isMyTurn && !drawLoading && !iFinished ? "border-primary/50 cursor-pointer shadow-[0_0_25px_rgba(0,212,255,0.2)] hover:shadow-[0_0_35px_rgba(0,212,255,0.3)] active:scale-95" : "border-white/10 opacity-40 cursor-not-allowed"}`}>
+                <button 
+                  onClick={drawCard} 
+                  disabled={!isMyTurn || drawLoading || iFinished} 
+                  className={`relative rounded-2xl h-28 w-[4.5rem] border-2 overflow-hidden transition-all ${isMyTurn && !drawLoading && !iFinished ? "border-primary/50 cursor-pointer shadow-[0_0_25px_rgba(0,212,255,0.2)] hover:shadow-[0_0_35px_rgba(0,212,255,0.3)] active:scale-95" : "border-white/10 opacity-40 cursor-not-allowed"}`}
+                >
                   <div className="absolute inset-0 bg-gradient-to-br from-[#1a1f2e] to-[#0d1117]" />
                   <div className="absolute inset-0 flex items-center justify-center">
-                    {drawLoading ? <Loader2 className="w-5 h-5 text-primary animate-spin" /> : <span className="text-[10px] font-black text-white/10 italic tracking-tighter">COACT</span>}
+                    {drawLoading ? (
+                      <Loader2 className="w-5 h-5 text-primary animate-spin" />
+                    ) : (
+                      <span className="text-[10px] font-black text-white/10 italic tracking-tighter">COACT</span>
+                    )}
                   </div>
-                  {isMyTurn && !drawLoading && !iFinished && <div className="absolute inset-0 border-2 border-primary/30 rounded-2xl animate-pulse" />}
+                  {isMyTurn && !drawLoading && !iFinished && (
+                    <div className="absolute inset-0 border-2 border-primary/30 rounded-2xl animate-pulse" />
+                  )}
                 </button>
               </div>
             </div>
@@ -178,7 +193,18 @@ export function UnoBoard({ session, socket, userName }: { session: SessionLike; 
                   <span className="text-[9px] font-black text-white/25 uppercase tracking-[0.2em]">Your Hand</span>
                   <span className="text-xs font-black text-primary">{myCards.length}</span>
                 </div>
-                {isMyTurn && <span className="text-[10px] text-primary font-bold animate-pulse">Tap a card to play</span>}
+                {isMyTurn && !state.hasDrawnThisTurn && <span className="text-[10px] text-primary font-bold animate-pulse">Tap a card to play</span>}
+                {isMyTurn && state.hasDrawnThisTurn && (
+                  <div className="flex items-center gap-3">
+                    <span className="text-[10px] text-yellow-400 font-bold animate-pulse">Play drawn card or pass</span>
+                    <button 
+                      onClick={passTurn} 
+                      className="bg-red-500/80 hover:bg-red-500 text-white text-[9px] font-black px-3 py-1 rounded-md border border-red-400/30 transition-all uppercase tracking-wider"
+                    >
+                      Pass Turn
+                    </button>
+                  </div>
+                )}
               </div>
               <div className="shrink-0 relative border-t border-white/5 bg-[#080b11]/90 backdrop-blur-md">
                 {!isMobile && myCards.length > 6 && (
@@ -187,13 +213,20 @@ export function UnoBoard({ session, socket, userName }: { session: SessionLike; 
                     <button onClick={() => scrollTray(1)} className="absolute right-1 top-1/2 -translate-y-1/2 z-20 w-7 h-14 rounded-lg bg-black/60 border border-white/10 flex items-center justify-center hover:bg-white/10"><ChevronRight className="w-4 h-4 text-white/60" /></button>
                   </>
                 )}
-                <div ref={trayRef} className="flex items-end gap-2 md:gap-3 px-4 md:px-12 py-3 md:py-4 overflow-x-auto scroll-smooth scrollbar-hide" style={{ scrollbarWidth: "none", msOverflowStyle: "none", WebkitOverflowScrolling: "touch" }}>
+                <div 
+                  ref={trayRef} 
+                  className="flex items-end gap-3 px-6 py-6 overflow-x-auto scroll-smooth scrollbar-hide w-screen max-w-full" 
+                  style={{ scrollbarWidth: "none", msOverflowStyle: "none", WebkitOverflowScrolling: "touch" }}
+                >
                   {myCards.map((card) => {
                     const playable = isMyTurn && playableSet.has(card.id);
                     return (
                       <motion.button key={card.id} onClick={() => onCardTap(card)} disabled={!playable}
-                        whileHover={playable ? { y: -8, scale: 1.05 } : {}} whileTap={playable ? { scale: 0.95 } : {}}
-                        className={`shrink-0 transition-all duration-200 ${!playable ? "cursor-not-allowed" : "cursor-pointer"}`}>
+                        whileHover={playable ? { y: -20, scale: 1.1, zIndex: 50, x: isMobile ? 5 : 0 } : {}} 
+                        whileTap={playable ? { scale: 0.95 } : {}}
+                        className={`shrink-0 transition-all duration-200 relative ${!playable ? "cursor-not-allowed" : "cursor-pointer"} ${isMobile ? "hover:z-50" : ""}`}
+                        style={{ zIndex: 10 }}
+                      >
                         <UnoCardFace card={card} playable={playable} compact={isMobile} />
                       </motion.button>
                     );
@@ -212,7 +245,7 @@ export function UnoBoard({ session, socket, userName }: { session: SessionLike; 
 
         {/* Right sidebar (desktop) */}
         {!isMobile && (
-          <aside className="w-56 xl:w-64 shrink-0 border-l border-white/5 bg-black/20 p-4 flex flex-col gap-3">
+          <aside className="fixed right-0 top-1/2 -translate-y-1/2 w-56 xl:w-64 z-[40] border-l border-white/5 bg-black/40 backdrop-blur-xl p-4 flex flex-col gap-3 rounded-l-3xl shadow-2xl max-h-[70vh]">
             <h3 className="text-[9px] font-black text-white/25 uppercase tracking-[0.2em] mb-1">Game Info</h3>
             <div className="p-3 rounded-xl bg-white/[0.03] border border-white/5 space-y-2">
               <div className="flex justify-between text-[10px]"><span className="text-white/30 font-bold">Direction</span><span className="text-white/60 font-bold uppercase">{state.direction || "—"}</span></div>
@@ -258,7 +291,7 @@ export function UnoBoard({ session, socket, userName }: { session: SessionLike; 
       {/* Game over */}
       {state.winner && (
         <WinnerScreen 
-          winnerName={state.winner}
+          winnerName={state.winner || ""}
           rankings={(state.winners || []).map(w => ({ name: w }))}
           onReturnToLobby={() => window.location.href = "/"}
           isCurrentUserWinner={state.winner === me}

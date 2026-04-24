@@ -17,7 +17,9 @@ interface SessionFloatingControllerProps {
   onToggleMic?: () => void;
   onOpenChat?: () => void;
   onOpenModeration?: () => void;
+  onTogglePin?: () => void;
   isMicMuted?: boolean;
+  isPinned?: boolean;
 }
 
 export const SessionFloatingController = React.memo(({
@@ -28,7 +30,9 @@ export const SessionFloatingController = React.memo(({
   onToggleMic,
   onOpenChat,
   onOpenModeration,
-  isMicMuted = false
+  onTogglePin,
+  isMicMuted = false,
+  isPinned = false
 }: SessionFloatingControllerProps) => {
   const [isOpen, setIsOpen] = useState(false);
   const timerRef = useRef<NodeJS.Timeout | null>(null);
@@ -59,12 +63,13 @@ export const SessionFloatingController = React.memo(({
     <motion.div
       drag
       dragMomentum={false}
-      initial={{ x: 20, y: window.innerHeight - 150 }}
-      className="fixed z-[100] touch-none"
+      dragElastic={0.1}
+      initial={{ x: 0, y: 0 }}
+      className="fixed z-[1000] touch-none right-6 bottom-6"
       onDragStart={handleInteraction}
       onDrag={handleInteraction}
     >
-      <div className="relative flex items-center">
+      <div className="relative flex items-center flex-row-reverse">
         <AnimatePresence mode="wait">
           {!isOpen ? (
             <motion.button
@@ -72,9 +77,7 @@ export const SessionFloatingController = React.memo(({
               initial={{ scale: 0, rotate: -180 }}
               animate={{ scale: 1, rotate: 0 }}
               exit={{ scale: 0, rotate: 180 }}
-              onClick={() => {
-                setIsOpen(true);
-              }}
+              onClick={() => setIsOpen(true)}
               className="w-12 h-12 bg-black/80 backdrop-blur-xl border border-white/10 rounded-full flex items-center justify-center text-white/70 hover:text-white hover:bg-black transition-colors shadow-2xl group"
             >
               <Settings className="w-6 h-6 group-hover:rotate-45 transition-transform" />
@@ -85,31 +88,29 @@ export const SessionFloatingController = React.memo(({
               initial={{ width: 48, opacity: 0, scale: 0.8 }}
               animate={{ width: "auto", opacity: 1, scale: 1 }}
               exit={{ width: 48, opacity: 0, scale: 0.8 }}
-              className="bg-[#0A0D14]/95 backdrop-blur-3xl border border-white/10 rounded-full px-2 py-2 flex items-center gap-1 shadow-[0_0_80px_rgba(0,0,0,0.8)] border-t-white/20"
+              className="bg-[#0A0D14]/95 backdrop-blur-3xl border border-white/10 rounded-full px-2 py-2 flex items-center gap-1.5 shadow-[0_0_80px_rgba(0,0,0,0.8)] border-t-white/20"
               onPointerDown={handleInteraction}
             >
-              <div className="flex items-center gap-1 px-1">
+              <div className="flex items-center gap-1 px-0.5">
                 <button 
                   onClick={(e) => {
                     e.stopPropagation();
-                    setIsOpen(false);
+                    if (isHost && onExitActivity) {
+                      onExitActivity();
+                      setIsOpen(false);
+                    } else if (!isHost) {
+                      setIsOpen(false);
+                    }
                   }}
-                  className="w-12 h-12 rounded-full flex items-center justify-center bg-white/10 text-white shadow-[0_0_20px_rgba(6,182,212,0.3)] ring-1 ring-cyan-500/50"
-                  title="Close"
+                  className={`w-12 h-12 rounded-full flex items-center justify-center bg-white/10 transition-all ${
+                    isHost ? "text-white shadow-[0_0_20px_rgba(6,182,212,0.3)] ring-1 ring-cyan-500/50" : "text-white/20"
+                  }`}
+                  title={isHost ? "Exit Activity" : "Close"}
                 >
                   <ArrowLeft className="w-5 h-5" />
                 </button>
                 
-                <div className="w-px h-8 bg-white/10 mx-2" />
-
-                {onExitActivity && (
-                  <ControllerButton 
-                    icon={LogOut} 
-                    onClick={onExitActivity} 
-                    label="Back to Lobby"
-                    onInteraction={handleInteraction}
-                  />
-                )}
+                <div className="w-px h-6 bg-white/10 mx-1" />
 
                 <ControllerButton 
                   icon={isMicMuted ? MicOff : Mic} 
@@ -138,12 +139,14 @@ export const SessionFloatingController = React.memo(({
 
                 <ControllerButton 
                   icon={Pin} 
-                  onClick={() => {}} 
-                  label="Pin UI"
+                  onClick={onTogglePin} 
+                  active={isPinned}
+                  activeColor="text-amber-400"
+                  label={isPinned ? "Unpin UI" : "Pin UI"}
                   onInteraction={handleInteraction}
                 />
 
-                <div className="w-px h-8 bg-white/10 mx-2" />
+                <div className="w-px h-6 bg-white/10 mx-1" />
 
                 <button 
                   onClick={(e) => {

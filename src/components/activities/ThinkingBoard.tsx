@@ -266,6 +266,11 @@ export function ThinkingBoard({
   const getPointerCenter = (e1: PointerEvent, e2: PointerEvent) => ({ x: (e1.clientX + e2.clientX) / 2, y: (e1.clientY + e2.clientY) / 2 });
 
   const onPointerDown = (e: React.PointerEvent) => {
+    try {
+      e.currentTarget.setPointerCapture(e.pointerId);
+    } catch (err) {
+      console.warn("Failed to set pointer capture:", err);
+    }
     activePointersRef.current.set(e.pointerId, e.nativeEvent);
 
     if (activePointersRef.current.size === 2) {
@@ -418,6 +423,11 @@ export function ThinkingBoard({
   };
 
   const onPointerUp = (e: React.PointerEvent) => {
+    try {
+      if (e.currentTarget.hasPointerCapture(e.pointerId)) {
+        e.currentTarget.releasePointerCapture(e.pointerId);
+      }
+    } catch (err) {}
     activePointersRef.current.delete(e.pointerId);
     if (activePointersRef.current.size < 2) pinchRef.current = null;
 
@@ -499,6 +509,11 @@ export function ThinkingBoard({
       onPointerMove={onPointerMove}
       onPointerUp={onPointerUp}
       onPointerLeave={(e) => {
+        try {
+          if (e.currentTarget.hasPointerCapture(e.pointerId)) {
+            e.currentTarget.releasePointerCapture(e.pointerId);
+          }
+        } catch (err) {}
         activePointersRef.current.delete(e.pointerId);
         if (activePointersRef.current.size === 0) { setIsPanning(false); setIsDrawing(false); pinchRef.current = null; }
       }}
@@ -549,21 +564,24 @@ export function ThinkingBoard({
         ))}
       </div>
 
-      {/* Toolbar Layer */}
-      <div onPointerDown={(e) => e.stopPropagation()} className="absolute top-4 left-1/2 -translate-x-1/2 z-20 bg-black/80 backdrop-blur-xl px-2 sm:px-4 py-2 sm:py-3 rounded-2xl border border-white/10 flex items-center flex-wrap justify-center gap-1.5 sm:gap-2 shadow-2xl max-w-[95vw]">
-        <div className="flex bg-white/5 rounded-xl p-1">
-          <button onClick={() => setTool("pan")} className={`p-2.5 rounded-lg transition-colors ${tool === "pan" ? "bg-primary text-black" : "text-white/60 hover:text-white"}`} title="Pan (Space/Middle Click)"><Move className="w-5 h-5" /></button>
-          <button disabled={!myPerms.move} onClick={() => setTool("move")} className={`p-2.5 rounded-lg transition-colors disabled:opacity-30 ${tool === "move" ? "bg-primary text-black" : "text-white/60 hover:text-white"}`} title="Move Text"><MousePointer2 className="w-5 h-5" /></button>
+      {/* Toolbar Layer - Optimized for Mobile (Double Row) */}
+      <div onPointerDown={(e) => e.stopPropagation()} className="absolute bottom-6 left-1/2 -translate-x-1/2 z-20 bg-[#0A0D14]/90 backdrop-blur-2xl p-2 sm:px-4 sm:py-2.5 rounded-[1.5rem] sm:rounded-full border border-white/10 flex flex-col sm:flex-row items-center justify-center gap-2 sm:gap-2 shadow-[0_20px_50px_rgba(0,0,0,0.5)] max-w-[98vw] sm:max-w-fit">
+        
+        {/* Row 1: Primary Tools */}
+        <div className="flex items-center justify-center gap-1 sm:gap-2">
+        <div className="flex bg-white/5 rounded-xl p-0.5 sm:p-1">
+          <button onClick={() => setTool("pan")} className={`p-1.5 sm:p-2.5 rounded-lg transition-colors ${tool === "pan" ? "bg-primary text-black" : "text-white/60 hover:text-white"}`} title="Pan (Space/Middle Click)"><Move className="w-4 h-4 sm:w-5 h-5" /></button>
+          <button disabled={!myPerms.move} onClick={() => setTool("move")} className={`p-1.5 sm:p-2.5 rounded-lg transition-colors disabled:opacity-30 ${tool === "move" ? "bg-primary text-black" : "text-white/60 hover:text-white"}`} title="Move Text"><MousePointer2 className="w-4 h-4 sm:w-5 h-5" /></button>
         </div>
         
         <div className="w-px h-8 bg-white/10" />
         
-        <div className="flex bg-white/5 rounded-xl p-1">
+        <div className="flex bg-white/5 rounded-xl p-0.5 sm:p-1">
           <Popover>
-            <PopoverTrigger disabled={!myPerms.draw} onClick={() => setTool("draw")} className={`p-2.5 rounded-lg transition-colors disabled:opacity-30 flex items-center gap-1 ${tool === "draw" ? "bg-primary text-black" : "text-white/60 hover:text-white"}`} title="Draw">
-              <Pencil className="w-5 h-5" />
+            <PopoverTrigger disabled={!myPerms.draw} onClick={() => setTool("draw")} className={`p-1.5 sm:p-2.5 rounded-lg transition-colors disabled:opacity-30 flex items-center gap-1 ${tool === "draw" ? "bg-primary text-black" : "text-white/60 hover:text-white"}`} title="Draw">
+              <Pencil className="w-4 h-4 sm:w-5 h-5" />
             </PopoverTrigger>
-            <PopoverContent side="bottom" className="w-64 bg-black/90 border-white/10 backdrop-blur-xl">
+            <PopoverContent side="top" className="w-64 bg-black/90 border-white/10 backdrop-blur-xl">
               <div className="space-y-4">
                 <div>
                   <p className="text-xs font-bold text-white/50 mb-2">Thickness</p>
@@ -582,10 +600,10 @@ export function ThinkingBoard({
           </Popover>
 
           <Popover>
-            <PopoverTrigger disabled={!myPerms.type} onClick={() => setTool("text")} className={`p-2.5 rounded-lg transition-colors disabled:opacity-30 flex items-center gap-1 ${tool === "text" ? "bg-primary text-black" : "text-white/60 hover:text-white"}`} title="Text">
-              <Type className="w-5 h-5" />
+            <PopoverTrigger disabled={!myPerms.type} onClick={() => setTool("text")} className={`p-1.5 sm:p-2.5 rounded-lg transition-colors disabled:opacity-30 flex items-center gap-1 ${tool === "text" ? "bg-primary text-black" : "text-white/60 hover:text-white"}`} title="Text">
+              <Type className="w-4 h-4 sm:w-5 h-5" />
             </PopoverTrigger>
-            <PopoverContent side="bottom" className="w-64 bg-black/90 border-white/10 backdrop-blur-xl space-y-4">
+            <PopoverContent side="top" className="w-64 bg-black/90 border-white/10 backdrop-blur-xl space-y-4">
                <div>
                   <p className="text-xs font-bold text-white/50 mb-2">Font Family</p>
                   <div className="flex gap-2">
@@ -606,14 +624,14 @@ export function ThinkingBoard({
           </Popover>
           
           <Popover>
-            <PopoverTrigger disabled={!myPerms.draw} className={`p-2.5 rounded-lg transition-colors disabled:opacity-30 flex items-center gap-1 ${(tool === "rect" || tool === "circle" || tool === "line" || tool === "triangle") ? "bg-primary text-black" : "text-white/60 hover:text-white"}`} title="Shapes">
-              {tool === "rect" ? <Square className="w-5 h-5" /> : 
-               tool === "circle" ? <Circle className="w-5 h-5" /> : 
-               tool === "triangle" ? <Triangle className="w-5 h-5" /> : 
-               tool === "line" ? <Minus className="w-5 h-5 transform -rotate-45" /> : 
-               <Square className="w-5 h-5" />}
+            <PopoverTrigger disabled={!myPerms.draw} className={`p-1.5 sm:p-2.5 rounded-lg transition-colors disabled:opacity-30 flex items-center gap-1 ${(tool === "rect" || tool === "circle" || tool === "line" || tool === "triangle") ? "bg-primary text-black" : "text-white/60 hover:text-white"}`} title="Shapes">
+              {tool === "rect" ? <Square className="w-4 h-4 sm:w-5 h-5" /> : 
+               tool === "circle" ? <Circle className="w-4 h-4 sm:w-5 h-5" /> : 
+               tool === "triangle" ? <Triangle className="w-4 h-4 sm:w-5 h-5" /> : 
+               tool === "line" ? <Minus className="w-4 h-4 sm:w-5 h-5 transform -rotate-45" /> : 
+               <Square className="w-4 h-4 sm:w-5 h-5" />}
             </PopoverTrigger>
-            <PopoverContent side="bottom" className="w-44 bg-black/95 border-white/10 backdrop-blur-xl p-1 shadow-2xl rounded-xl">
+            <PopoverContent side="top" className="w-44 bg-black/95 border-white/10 backdrop-blur-xl p-1 shadow-2xl rounded-xl">
               <div className="flex flex-col gap-0.5">
                 <Button variant="ghost" onClick={() => setTool("rect")} className={`justify-start gap-3 h-11 px-3 rounded-lg ${tool === "rect" ? "bg-white/10 text-white" : "text-white/60 hover:text-white hover:bg-white/5"}`}>
                   <Square className="w-4 h-4" /> <span className="text-xs font-bold uppercase tracking-wider">Rectangle</span>
@@ -634,12 +652,12 @@ export function ThinkingBoard({
 
         <div className="w-px h-8 bg-white/10" />
         
-        <div className="flex bg-white/5 rounded-xl p-1">
+        <div className="flex bg-white/5 rounded-xl p-0.5 sm:p-1">
           <Popover>
-            <PopoverTrigger disabled={!myPerms.erase} onClick={() => setTool("eraser")} className={`p-2.5 rounded-lg transition-colors disabled:opacity-30 ${tool === "eraser" ? "bg-red-400 text-black" : "text-white/60 hover:text-white"}`} title="Eraser Brush">
-              <Eraser className="w-5 h-5" />
+            <PopoverTrigger disabled={!myPerms.erase} onClick={() => setTool("eraser")} className={`p-1.5 sm:p-2.5 rounded-lg transition-colors disabled:opacity-30 ${tool === "eraser" ? "bg-red-400 text-black" : "text-white/60 hover:text-white"}`} title="Eraser Brush">
+              <Eraser className="w-4 h-4 sm:w-5 h-5" />
             </PopoverTrigger>
-            <PopoverContent side="bottom" className="w-64 bg-black/90 border-white/10 backdrop-blur-xl space-y-4">
+            <PopoverContent side="top" className="w-64 bg-black/90 border-white/10 backdrop-blur-xl space-y-4">
               <div>
                 <p className="text-xs font-bold text-white/50 mb-2">Eraser Frequency</p>
                 <div className="flex gap-2">
@@ -651,51 +669,41 @@ export function ThinkingBoard({
             </PopoverContent>
           </Popover>
 
-          <button disabled={!myPerms.erase} onClick={() => setTool("lineEraser")} className={`p-2.5 rounded-lg transition-colors disabled:opacity-30 ${tool === "lineEraser" ? "bg-red-500 text-black" : "text-white/60 hover:text-white"}`} title="Delete Whole Element">
-            <Trash2 className="w-5 h-5" />
+          <button disabled={!myPerms.erase} onClick={() => setTool("lineEraser")} className={`p-1.5 sm:p-2.5 rounded-lg transition-colors disabled:opacity-30 ${tool === "lineEraser" ? "bg-red-500 text-black" : "text-white/60 hover:text-white"}`} title="Delete Whole Element">
+            <Trash2 className="w-4 h-4 sm:w-5 h-5" />
           </button>
         </div>
 
         <div className="w-px h-8 bg-white/10" />
         
-        <div className="flex bg-white/5 rounded-xl p-1">
-          <button onClick={undo} disabled={history.length === 0} className="p-2.5 rounded-lg transition-colors text-white/60 hover:text-white disabled:opacity-30"><Undo2 className="w-5 h-5" /></button>
-          <button onClick={redo} disabled={redoStack.length === 0} className="p-2.5 rounded-lg transition-colors text-white/60 hover:text-white disabled:opacity-30"><Redo2 className="w-5 h-5" /></button>
         </div>
+        
+        {/* Row 2: Secondary Tools (Colors & Zoom) */}
+        <div className="flex items-center justify-center gap-2">
+          <div className="w-px h-6 bg-white/10 hidden sm:block" />
 
-        <div className="flex items-center gap-1.5 px-2">
+        <div className="flex items-center gap-1 sm:gap-1.5 px-1 sm:px-2">
           {palette.map((c) => (
-            <button key={c} onClick={() => setColor(c)} className={`w-6 h-6 rounded-full border-2 transition-transform ${color === c ? "ring-2 ring-white scale-110" : "border-transparent"}`} style={{ background: c }} />
+            <button key={c} onClick={() => setColor(c)} className={`w-5 h-5 sm:w-6 sm:h-6 rounded-full border-2 transition-transform ${color === c ? "ring-2 ring-white scale-110" : "border-transparent"}`} style={{ background: c }} />
           ))}
         </div>
 
         <div className="w-px h-8 bg-white/10 hidden md:block" />
         
-        <div className="flex bg-white/5 rounded-xl p-1">
+        <div className="bg-white/5 rounded-xl p-0.5 sm:p-1 hidden sm:flex">
           <button onClick={() => setScale(s => Math.min(5, s * 1.2))} className="p-2.5 rounded-lg text-white/60 hover:text-white" title="Zoom In"><ZoomIn className="w-5 h-5" /></button>
           <button onClick={() => setScale(s => Math.max(0.1, s / 1.2))} className="p-2.5 rounded-lg text-white/60 hover:text-white" title="Zoom Out"><ZoomOut className="w-5 h-5" /></button>
           <button onClick={() => { setScale(1); setPan({ x: 0, y: 0 }); }} className="p-2.5 rounded-lg text-white/60 hover:text-white" title="Reset View"><Maximize2 className="w-5 h-5" /></button>
         </div>
 
-        {isHost && (
-          <>
-            <div className="w-px h-8 bg-white/10" />
-            <Button 
-              variant="destructive" 
-              size="sm" 
-              onClick={() => socket.emit("session:end", { sessionId })}
-              className="rounded-xl h-10 px-4 font-bold gap-2 whitespace-nowrap"
-            >
-              <X className="w-4 h-4" /> <span className="hidden sm:inline">Exit Board</span>
-            </Button>
-          </>
-        )}
+
       </div>
+    </div>
 
       {isHost && (
-        <div className="absolute bottom-4 right-4 z-20 flex flex-col items-end gap-2">
+        <div className="absolute top-4 right-4 z-[150] flex flex-col items-end gap-2">
           <Popover>
-            <PopoverTrigger className="bg-black/80 backdrop-blur-md border border-white/10 px-4 py-2 text-sm font-medium rounded-md hover:bg-black hover:text-white transition-colors flex items-center">
+            <PopoverTrigger className="bg-black/80 backdrop-blur-md border border-white/10 px-4 py-2 text-sm font-medium rounded-md hover:bg-black hover:text-white transition-colors flex items-center shadow-xl cursor-pointer">
               <Settings2 className="w-4 h-4 mr-2"/> Permissions
             </PopoverTrigger>
             <PopoverContent className="w-80 bg-black/95 border-white/10 p-4">

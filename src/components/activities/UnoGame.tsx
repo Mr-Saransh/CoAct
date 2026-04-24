@@ -15,7 +15,7 @@ function RoleBadge({ role }: { role: "player" | "spectator" }) {
   );
 }
 
-export function UnoHost({ session, socket }: { session: SessionLike; socket: SocketLike }) {
+export function UnoHost({ session, socket, userName }: { session: SessionLike; socket: SocketLike; userName: string }) {
   const players = (session?.participants || []).filter((p) => p.isConnected);
   const [cardsPerPlayer, setCardsPerPlayer] = useState<7 | 9>(7);
   const unoState = (session?.activityData || {}) as Partial<UnoState>;
@@ -96,7 +96,7 @@ export function UnoHost({ session, socket }: { session: SessionLike; socket: Soc
     );
   }
 
-  return <UnoBoard session={session} socket={socket} />;
+  return <UnoBoard session={session} socket={socket} userName={userName} />;
 }
 
 export function UnoParticipant({ session, socket, userName }: { session: SessionLike; socket: SocketLike; userName: string }) {

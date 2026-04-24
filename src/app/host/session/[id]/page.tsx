@@ -134,6 +134,16 @@ function HostSessionContent() {
   const [activeCategory, setActiveCategory] = useState<keyof typeof ACTIVITIES>("classroom");
   const [showSidebar, setShowSidebar] = useState(false);
   const [isMuted, setIsMuted] = useState(false);
+  const [isFullscreen, setIsFullscreen] = useState(false);
+  const [activePanel, setActivePanel] = useState<"chat" | "mod" | null>(null);
+
+  const handleToggleMic = useCallback(() => {
+    const newState = !isMuted;
+    setIsMuted(newState);
+    socket?.emit("voice:toggle", { sessionId, userName: hostName, micOn: !newState });
+  }, [isMuted, socket, sessionId, hostName]);
+
+
 
   const setCategory = (cat: keyof typeof ACTIVITIES) => {
     setActiveCategory(cat);
@@ -160,7 +170,35 @@ function HostSessionContent() {
     }
   }, [session, userId, sessionId, hostName, safeNavigate]);
 
-  const isLive = session?.status === "live" || (session?.status === "waiting" && session?.mode !== "lobby");
+  useEffect(() => {
+    if (!session || !userId) return;
+    const me = session.participants.find(p => p.userId === userId);
+    if (me && me.micOn === isMuted) {
+      setIsMuted(!me.micOn);
+    }
+  }, [session?.participants, userId]);
+
+  const handleExitActivity = useCallback(() => endActivity(), [endActivity]);
+  const handleEndSession = useCallback(() => { socket?.emit("session:end", { sessionId }); window.location.href = "/"; }, [socket, sessionId]);
+  const handleOpenChat = useCallback(() => setActivePanel("chat"), []);
+  const handleOpenModeration = useCallback(() => setActivePanel("mod"), []);
+
+  const handleTogglePin = useCallback(() => {
+    if (!document.fullscreenElement) {
+      document.documentElement.requestFullscreen().catch(err => {
+        console.error(`Error attempting to enable full-screen mode: ${err.message}`);
+      });
+      setIsFullscreen(true);
+    } else {
+      document.exitFullscreen();
+      setIsFullscreen(false);
+    }
+  }, []);
+
+
+
+
+  const isLive = session?.mode !== "lobby" && (session?.status === "live" || session?.status === "waiting");
   const currentMode = session?.mode ?? "lobby";
   const participants = session?.participants ?? [];
   const joinedCount = participants.length;
@@ -176,26 +214,15 @@ function HostSessionContent() {
 
   return (
     <div className="flex flex-col h-[100dvh] bg-[#050505] text-white overflow-hidden isolate font-sans">
-      {session && socket && (
-        <SessionControls 
-          session={session} 
-          socket={socket} 
-          userName={hostName} 
-          isHost={true} 
-          onLeave={() => window.location.href = "/"}
-          onBack={() => {
-            if (session.mode !== 'lobby') endActivity();
-          }}
-        />
-      )}
+
       
       {/* Premium Header */}
       {!(currentMode === 'board' || currentMode === 'thoughtmap') && (
-        <header className="h-20 border-b border-white/5 flex items-center justify-between px-8 shrink-0 bg-[#0A0D14]/40 premium-blur z-[100] relative">
+        <header className="h-16 md:h-20 border-b border-white/5 flex items-center justify-between px-4 md:px-8 shrink-0 bg-[#0A0D14]/40 premium-blur z-[100] relative">
           <div className="absolute inset-x-0 bottom-0 h-px bg-gradient-to-r from-transparent via-primary/20 to-transparent" />
           
-          <div className="flex items-center gap-6">
-            <div className="relative w-36 h-10 transition-transform duration-500 hover:scale-105">
+          <div className="flex items-center gap-3 md:gap-6">
+            <div className="relative w-24 h-8 md:w-36 md:h-10 transition-transform duration-500 hover:scale-105">
               <Image 
                 src="/logo.png" 
                 alt="CoAct Logo" 
@@ -206,14 +233,14 @@ function HostSessionContent() {
               />
             </div>
             <div className="h-6 w-px bg-white/10" />
-            <div className="flex items-center gap-3 bg-white/5 px-4 py-2 rounded-full border border-white/10 group cursor-default">
-              <span className="text-[10px] font-black text-white/30 uppercase tracking-[0.2em] group-hover:text-primary transition-colors">Session ID</span>
-              <span className="font-mono text-sm font-black text-primary uppercase tracking-widest">{sessionId}</span>
+            <div className="flex items-center gap-2 md:gap-3 bg-white/5 px-3 md:px-4 py-1.5 md:py-2 rounded-full border border-white/10 group cursor-default">
+              <span className="text-[10px] font-black text-white/30 uppercase tracking-[0.2em] group-hover:text-primary transition-colors hidden md:block">Session ID</span>
+              <span className="font-mono text-xs md:text-sm font-black text-primary uppercase tracking-widest">{sessionId}</span>
             </div>
           </div>
 
-          <div className="flex items-center gap-6">
-            <div className="flex items-center gap-8">
+          <div className="flex items-center gap-3 md:gap-6">
+            <div className="flex items-center gap-4 md:gap-8">
               <div 
                 className="relative"
               >
@@ -221,7 +248,7 @@ function HostSessionContent() {
                   onClick={() => setShowParticipants(!showParticipants)}
                   className={`flex flex-col items-end transition-all duration-300 hover:scale-105 active:scale-95 group cursor-pointer ${showParticipants ? 'text-primary' : ''}`}
                 >
-                  <span className="text-[10px] font-black text-white/30 uppercase tracking-[0.2em] group-hover:text-primary/70 transition-colors">Participants</span>
+                  <span className="text-[10px] font-black text-white/30 uppercase tracking-[0.2em] group-hover:text-primary/70 transition-colors hidden md:block">Participants</span>
                   <div className="flex items-center gap-2 mt-0.5">
                     <div className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse shadow-[0_0_10px_rgba(34,197,94,0.5)]" />
                     <span className="text-sm font-black text-white group-hover:text-primary transition-colors">{joinedCount} Online</span>
@@ -235,7 +262,7 @@ function HostSessionContent() {
                       initial={{ opacity: 0, y: 10, scale: 0.95 }}
                       animate={{ opacity: 1, y: 0, scale: 1 }}
                       exit={{ opacity: 0, y: 10, scale: 0.95 }}
-                      className="absolute top-full right-0 mt-4 w-72 bg-[#0A0D14]/95 backdrop-blur-2xl border border-white/10 rounded-2xl shadow-[0_20px_50px_rgba(0,0,0,0.5)] z-[200] overflow-hidden"
+                      className="absolute top-full right-0 mt-4 w-64 md:w-72 bg-[#0A0D14]/95 backdrop-blur-2xl border border-white/10 rounded-2xl shadow-[0_20px_50px_rgba(0,0,0,0.5)] z-[200] overflow-hidden"
                     >
                       <div className="p-4 border-b border-white/5 flex items-center justify-between">
                         <span className="text-xs font-black uppercase tracking-widest text-white/40">Manage Participants</span>
@@ -314,18 +341,24 @@ function HostSessionContent() {
                 className="fixed inset-0 bg-black/80 backdrop-blur-md z-[110] lg:hidden"
               />
               
-              <motion.aside 
+               <motion.aside 
                 initial={{ x: -400 }}
                 animate={{ x: 0 }}
                 exit={{ x: -400 }}
                 transition={{ type: "spring", damping: 30, stiffness: 300 }}
-                className="fixed lg:relative left-0 top-0 bottom-0 z-[120] w-[360px] bg-[#0A0D14]/90 premium-blur border-r border-white/5 p-6 flex flex-col gap-6 shadow-2xl overflow-y-auto custom-scrollbar"
+                className="fixed left-0 top-0 bottom-0 z-[150] w-[360px] max-w-[90vw] bg-[#0A0D14]/95 backdrop-blur-3xl border-r border-white/10 p-6 flex flex-col gap-6 shadow-[0_0_100px_rgba(0,0,0,0.8)] overflow-y-auto custom-scrollbar"
               >
-                <div className="flex items-center justify-between mb-2">
-                  <span className="text-xs font-black text-white/40 uppercase tracking-[0.2em]">Live Session</span>
-                  <button onClick={() => setShowSidebar(false)} className="w-8 h-8 rounded-full hover:bg-white/5 flex items-center justify-center transition-colors">
-                    <X className="w-4 h-4 text-white/40" />
-                  </button>
+                <div className="flex flex-col gap-1 mb-2">
+                  <div className="flex items-center justify-between">
+                    <span className="text-[10px] font-black text-primary uppercase tracking-[0.3em]">Session Dashboard</span>
+                    <button onClick={() => setShowSidebar(false)} className="w-8 h-8 rounded-full hover:bg-white/10 flex items-center justify-center transition-colors">
+                      <X className="w-4 h-4 text-white/40" />
+                    </button>
+                  </div>
+                  <div className="flex items-center gap-2 bg-white/5 px-3 py-1.5 rounded-lg border border-white/10 w-fit">
+                    <span className="text-[9px] font-bold text-white/40 uppercase tracking-widest">ID:</span>
+                    <span className="text-sm font-mono font-black text-white tracking-widest uppercase">{sessionId}</span>
+                  </div>
                 </div>
 
                 {/* Session QR Section */}
@@ -411,7 +444,7 @@ function HostSessionContent() {
               currentMode === "wordchain" ? <WordChainHost session={session} socket={socket} userName={hostName} updateActivity={updateActivity} /> :
               currentMode === "mostlikely" ? <MostLikelyHost session={session} updateActivity={updateActivity} /> :
               currentMode === "study" ? <GroupStudyHost session={session} updateActivity={updateActivity} /> :
-              currentMode === "uno" ? <UnoHost session={session} socket={socket} /> :
+              currentMode === "uno" ? <UnoHost session={session} socket={socket} userName={hostName} /> :
               currentMode === "ludo" ? <LudoHost session={session} socket={socket} /> :
               currentMode === "thoughtmap" ? <ThoughtMapHost session={session} updateActivity={updateActivity} /> :
               currentMode === "courtroom" ? <CourtroomHost session={session} updateActivity={updateActivity} /> :
@@ -649,20 +682,34 @@ function HostSessionContent() {
         </main>
       </div>
 
+      {session && socket && (
+        <SessionControls 
+          session={session} 
+          socket={socket} 
+          userName={hostName} 
+          isHost={true} 
+          onLeave={() => window.location.href = "/"}
+          onBack={handleExitActivity}
+          showBar={false}
+          activePanel={activePanel}
+          setActivePanel={setActivePanel}
+        />
+      )}
+
       <InvitePanel sessionId={sessionId} open={inviteOpen} onClose={() => setInviteOpen(false)} />
-      <AnimatePresence>
-        {isLive && (
-          <SessionFloatingController 
-            isHost={true}
-            onExitActivity={() => startActivity("lobby" as any)}
-            onEndSession={() => { socket?.emit("session:end", { sessionId }); window.location.href = "/"; }}
-            onToggleMic={() => setIsMuted(!isMuted)}
-            isMicMuted={isMuted}
-            onOpenChat={() => alert("Chat Panel Coming Soon!")}
-            onOpenModeration={() => setShowSidebar(true)}
-          />
-        )}
-      </AnimatePresence>
+      <SessionFloatingController 
+        isHost={true}
+        onExitActivity={handleExitActivity}
+        onEndSession={handleEndSession}
+        onToggleMic={handleToggleMic}
+        isMicMuted={isMuted}
+        onOpenChat={handleOpenChat}
+        onOpenModeration={handleOpenModeration}
+        onTogglePin={handleTogglePin}
+        isPinned={isFullscreen}
+      />
+
+
     </div>
   );
 }

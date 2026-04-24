@@ -12,7 +12,10 @@ export function SessionControls({
   userName, 
   isHost, 
   onLeave, 
-  onBack 
+  onBack,
+  showBar = true,
+  activePanel = null,
+  setActivePanel = () => {}
 }: { 
   session: any; 
   socket: any; 
@@ -20,8 +23,14 @@ export function SessionControls({
   isHost: boolean; 
   onLeave: () => void; 
   onBack: () => void; 
+  showBar?: boolean;
+  activePanel?: "chat" | "mod" | null;
+  setActivePanel?: (panel: "chat" | "mod" | null) => void;
 }) {
-  const [activePanel, setActivePanel] = useState<"chat" | "mod" | null>(null);
+  const [internalActivePanel, setInternalActivePanel] = useState<"chat" | "mod" | null>(null);
+  const currentActivePanel = activePanel !== undefined ? activePanel : internalActivePanel;
+  const currentSetActivePanel = activePanel !== undefined ? setActivePanel : setInternalActivePanel;
+
   const [message, setMessage] = useState("");
   const [voiceActive, setVoiceActive] = useState(false);
   const [audioUnlocked, setAudioUnlocked] = useState(false);
@@ -64,8 +73,9 @@ export function SessionControls({
   };
 
   const togglePanel = (panel: "chat" | "mod") => {
-    setActivePanel(activePanel === panel ? null : panel);
+    currentSetActivePanel(currentActivePanel === panel ? null : panel);
   };
+
 
   const kickUser = (targetUserId: string, targetName: string) => {
     if (confirm(`Remove and BAN ${targetName} from the session? They won't be able to rejoin unless you unban them.`)) {
@@ -106,95 +116,86 @@ export function SessionControls({
   return (
     <>
       {/* Floating Draggable Control Bar */}
-      <motion.div 
-        drag
-        dragMomentum={false}
-        dragElastic={0}
-        whileDrag={{ scale: 1.02, cursor: "grabbing" }}
-        className={`fixed ${isFocusMode ? 'bottom-4 right-4 translate-x-0 left-auto' : 'bottom-4 md:bottom-12 left-1/2 -translate-x-1/2'} z-[100] flex items-center gap-1.5 md:gap-3 bg-black/40 backdrop-blur-[32px] border border-white/10 px-3 py-2 md:px-6 md:py-4 rounded-[2rem] md:rounded-[2.5rem] shadow-[0_32px_64px_-12px_rgba(0,0,0,0.6)] cursor-grab touch-none select-none pointer-events-auto ring-1 ring-white/10 transition-all duration-500`}
-      >
-        {!isFocusMode && (
-          <>
-            <div className="relative group">
-              <Button 
-                variant="ghost" 
-                size="icon" 
-                onClick={onBack} 
-                title="Go Back" 
-                className="text-white hover:bg-white/10 rounded-full w-9 h-9 md:w-14 md:h-14 relative border border-primary/40 shadow-[0_0_20px_rgba(0,212,255,0.2)] hover:border-primary transition-all duration-300"
-              >
-                <ArrowLeft className="w-4 h-4 md:w-6 md:h-6" />
-              </Button>
-            </div>
-
-            <div className="w-px h-8 md:h-10 bg-white/10 mx-1 md:mx-2" />
-          </>
-        )}
-        
-        <div className="flex items-center gap-1 md:gap-2">
+      {showBar && (
+        <motion.div 
+          drag
+          dragMomentum={false}
+          dragElastic={0}
+          whileDrag={{ scale: 1.02, cursor: "grabbing" }}
+          className={`fixed ${isFocusMode ? 'bottom-4 right-4 translate-x-0 left-auto' : 'bottom-4 md:bottom-12 left-1/2 -translate-x-1/2'} z-[100] flex items-center gap-1.5 md:gap-3 bg-black/40 backdrop-blur-[32px] border border-white/10 px-3 py-2 md:px-6 md:py-4 rounded-[2rem] md:rounded-[2.5rem] shadow-[0_32px_64px_-12px_rgba(0,0,0,0.6)] cursor-grab touch-none select-none pointer-events-auto ring-1 ring-white/10 transition-all duration-500`}
+        >
           {!isFocusMode && (
             <>
-              <Button 
-                variant={voiceActive ? "default" : "ghost"} 
-                size="icon" 
-                onClick={toggleVoice} 
-                title={isMutedByHost ? "Muted by Host" : "Toggle Voice"}
-                className={`rounded-full w-9 h-9 md:w-14 md:h-14 transition-all duration-300 border border-transparent ${voiceActive ? "bg-green-500/20 border-green-500/50 text-green-400 shadow-[0_0_30px_rgba(34,197,94,0.2)] hover:bg-green-500/30" : "text-white/40 hover:text-white hover:bg-white/10"} ${isMutedByHost ? "opacity-50 cursor-not-allowed text-red-400" : ""}`}
-              >
-                {voiceActive ? <Mic className="w-4 h-4 md:w-6 md:h-6" /> : <MicOff className="w-4 h-4 md:w-6 md:h-6" />}
-              </Button>
+              <div className="relative group">
+                <Button 
+                  variant="ghost" 
+                  size="icon" 
+                  onClick={onBack} 
+                  title="Go Back" 
+                  className="text-white hover:bg-white/10 rounded-full w-9 h-9 md:w-14 md:h-14 relative border border-primary/40 shadow-[0_0_20px_rgba(0,212,255,0.2)] hover:border-primary transition-all duration-300"
+                >
+                  <ArrowLeft className="w-4 h-4 md:w-6 md:h-6" />
+                </Button>
+              </div>
 
-              <Button 
-                variant={activePanel === "chat" ? "default" : "ghost"} 
-                size="icon" 
-                onClick={() => togglePanel("chat")} 
-                title="Community Chat"
-                className={`rounded-full w-9 h-9 md:w-14 md:h-14 transition-all duration-300 border border-transparent ${activePanel === "chat" ? "bg-primary/20 border-primary/50 text-primary shadow-[0_0_30px_rgba(0,212,255,0.2)] hover:bg-primary/30" : "text-white/40 hover:text-white hover:bg-white/10"}`}
-              >
-                <MessageSquare className="w-4 h-4 md:w-6 md:h-6" />
-              </Button>
+              <div className="w-px h-8 md:h-10 bg-white/10 mx-1 md:mx-2" />
             </>
           )}
+          
+          <div className="flex items-center gap-1 md:gap-2">
+            {!isFocusMode && (
+              <>
+                <Button 
+                  variant={voiceActive ? "default" : "ghost"} 
+                  size="icon" 
+                  onClick={toggleVoice} 
+                  title={isMutedByHost ? "Muted by Host" : "Toggle Voice"}
+                  className={`rounded-full w-9 h-9 md:w-14 md:h-14 transition-all duration-300 border border-transparent ${voiceActive ? "bg-green-500/20 border-green-500/50 text-green-400 shadow-[0_0_30px_rgba(34,197,94,0.2)] hover:bg-green-500/30" : "text-white/40 hover:text-white hover:bg-white/10"} ${isMutedByHost ? "opacity-50 cursor-not-allowed text-red-400" : ""}`}
+                >
+                  {voiceActive ? <Mic className="w-4 h-4 md:w-6 md:h-6" /> : <MicOff className="w-4 h-4 md:w-6 md:h-6" />}
+                </Button>
 
-          {isHost && (
-            <Button 
-              variant={activePanel === "mod" ? "default" : "ghost"} 
-              size="icon" 
-              onClick={() => togglePanel("mod")} 
-              title="Moderation Controls"
-              className={`rounded-full w-9 h-9 md:w-14 md:h-14 transition-all duration-300 border border-transparent ${activePanel === "mod" ? "bg-violet-500/20 border-violet-500/50 text-violet-400 shadow-[0_0_30px_rgba(139,92,246,0.2)] hover:bg-violet-500/30" : "text-white/40 hover:text-white hover:bg-white/10"}`}
-            >
-              <Shield className="w-4 h-4 md:w-6 md:h-6" />
-            </Button>
-          )}
+                <Button 
+                  variant={currentActivePanel === "chat" ? "default" : "ghost"} 
+                  size="icon" 
+                  onClick={() => togglePanel("chat")} 
+                  title="Community Chat"
+                  className={`rounded-full w-9 h-9 md:w-14 md:h-14 transition-all duration-300 border border-transparent ${currentActivePanel === "chat" ? "bg-primary/20 border-primary/50 text-primary shadow-[0_0_30px_rgba(0,212,255,0.2)] hover:bg-primary/30" : "text-white/40 hover:text-white hover:bg-white/10"}`}
+                >
+                  <MessageSquare className="w-4 h-4 md:w-6 md:h-6" />
+                </Button>
+              </>
+            )}
+
+            {isHost && (
+              <Button 
+                variant={currentActivePanel === "mod" ? "default" : "ghost"} 
+                size="icon" 
+                onClick={() => togglePanel("mod")} 
+                title="Moderation Controls"
+                className={`rounded-full w-9 h-9 md:w-14 md:h-14 transition-all duration-300 border border-transparent ${currentActivePanel === "mod" ? "bg-violet-500/20 border-violet-500/50 text-violet-400 shadow-[0_0_30px_rgba(139,92,246,0.2)] hover:bg-violet-500/30" : "text-white/40 hover:text-white hover:bg-white/10"}`}
+              >
+                <Shield className="w-4 h-4 md:w-6 md:h-6" />
+              </Button>
+            )}
+          </div>
+
+          <div className="w-px h-8 md:h-10 bg-white/10 mx-1 md:mx-2" />
 
           <Button 
             variant="ghost" 
             size="icon" 
-            onClick={toggleFullscreen} 
-            title="Toggle Fullscreen"
-            className="rounded-full w-9 h-9 md:w-14 md:h-14 text-white/40 hover:text-white hover:bg-white/10 transition-all duration-300"
+            onClick={onLeave} 
+            title="Exit Session"
+            className="rounded-full w-9 h-9 md:w-14 md:h-14 text-white/40 hover:text-red-400 hover:bg-red-500/10 transition-all duration-300 border border-transparent hover:border-red-500/30"
           >
-            <Pin className={`w-4 h-4 md:w-6 md:h-6 transform ${isFullscreen ? 'rotate-45' : ''}`} />
+            <LogOut className="w-4 h-4 md:w-6 md:h-6" />
           </Button>
-        </div>
+        </motion.div>
+      )}
 
-        <div className="w-px h-8 md:h-10 bg-white/10 mx-1 md:mx-2" />
-
-        <Button 
-          variant="ghost" 
-          size="icon" 
-          onClick={onLeave} 
-          title="Exit Session"
-          className="rounded-full w-9 h-9 md:w-14 md:h-14 text-white/40 hover:text-red-400 hover:bg-red-500/10 transition-all duration-300 border border-transparent hover:border-red-500/30"
-        >
-          <LogOut className="w-4 h-4 md:w-6 md:h-6" />
-        </Button>
-      </motion.div>
-
-      {/* Side Panels */}
       <AnimatePresence>
-        {activePanel === "chat" && (
+        {currentActivePanel === "chat" && (
           <motion.div 
             initial={{ opacity: 0, x: 300 }}
             animate={{ opacity: 1, x: 0 }}
@@ -205,10 +206,11 @@ export function SessionControls({
               <h3 className="font-outfit font-bold text-lg flex items-center gap-2">
                 <MessageSquare className="w-5 h-5 text-primary" /> Community Chat
               </h3>
-              <Button variant="ghost" size="icon" onClick={() => setActivePanel(null)} className="h-8 w-8 text-muted-foreground hover:text-white">
+              <Button variant="ghost" size="icon" onClick={() => currentSetActivePanel(null)} className="h-8 w-8 text-muted-foreground hover:text-white">
                 <X className="w-4 h-4" />
               </Button>
             </div>
+
             
             <div className="flex-1 overflow-y-auto p-4 space-y-4">
               {session.chatMessages?.length === 0 ? (
@@ -254,7 +256,7 @@ export function SessionControls({
           </motion.div>
         )}
 
-        {activePanel === "mod" && isHost && (
+        {currentActivePanel === "mod" && isHost && (
           <motion.div 
             initial={{ opacity: 0, x: 300 }}
             animate={{ opacity: 1, x: 0 }}
@@ -265,10 +267,11 @@ export function SessionControls({
               <h3 className="font-outfit font-bold text-lg flex items-center gap-2">
                 <Shield className="w-5 h-5 text-violet-400" /> Moderation
               </h3>
-              <Button variant="ghost" size="icon" onClick={() => setActivePanel(null)} className="h-8 w-8 text-muted-foreground hover:text-white">
+              <Button variant="ghost" size="icon" onClick={() => currentSetActivePanel(null)} className="h-8 w-8 text-muted-foreground hover:text-white">
                 <X className="w-4 h-4" />
               </Button>
             </div>
+
             
             <div className="flex-1 overflow-y-auto p-4 space-y-6">
               <div className="space-y-4">

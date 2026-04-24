@@ -439,15 +439,19 @@ app.prepare().then(() => {
       }
     })
 
-    socket.on('board:set_config', ({ sessionId, mode, livePermission, allowedUsers }) => {
+    socket.on('board:set_config', ({ sessionId, mode, defaultPermissions, userPermissions }) => {
       const session = sessions.get(sessionId)
-      if (!session || session.mode !== 'board' || session.hostId !== socket.data.userId) return
+      if (!session || (session.mode !== 'board' && session.mode !== 'thoughtmap') || session.hostId !== socket.data.userId) return
       const board = ensureBoardState(session)
+      
       if (mode === 'live' || mode === 'private') board.mode = mode
-      if (livePermission === 'all' || livePermission === 'host' || livePermission === 'selected') {
-        board.livePermission = livePermission
+      if (defaultPermissions) {
+        board.defaultPermissions = { ...board.defaultPermissions, ...defaultPermissions }
       }
-      if (Array.isArray(allowedUsers)) board.allowedUsers = allowedUsers
+      if (userPermissions) {
+        board.userPermissions = { ...board.userPermissions, ...userPermissions }
+      }
+      
       broadcastState(sessionId)
     })
 
@@ -753,18 +757,40 @@ app.prepare().then(() => {
       const user = socket.data.name
       if (!user || state.turn !== user) return
       if (state.hasDrawnThisTurn) return
-      // Check if user is still in the active order
       if (!state.order.includes(user)) return
 
       const hand = state.players[user]?.cards || []
-      // Draw is always allowed — no hasPlayable check
       const drawn = drawFromPile(state, 1)
       if (!drawn.length) return
-      hand.push(drawn[0])
+      
+      const drawnCard = drawn[0]
+      hand.push(drawnCard)
       state.hasDrawnThisTurn = true
       io.to(sessionId).emit('draw_card', { user, count: 1 })
 
-      // After drawing, auto-advance turn
+      // Check if the DRAWN card is playable
+      if (isPlayable(drawnCard, state)) {
+        // Allow the player to play it or pass
+        broadcastState(sessionId)
+      } else {
+        // Auto-advance since nothing else can be done
+        state.hasDrawnThisTurn = false
+        io.to(sessionId).emit('next_turn', { from: user })
+        advanceTurn(state, 1)
+        startUnoTimer(sessionId)
+        broadcastState(sessionId)
+      }
+    })
+
+    socket.on('uno:pass', ({ sessionId }) => {
+      const session = sessions.get(sessionId)
+      if (!session || session.mode !== 'uno') return
+      const state = session.activityData
+      if (!state || state.status !== 'live') return
+      const user = socket.data.name
+      if (!user || state.turn !== user) return
+      if (!state.hasDrawnThisTurn) return
+
       state.hasDrawnThisTurn = false
       io.to(sessionId).emit('next_turn', { from: user })
       advanceTurn(state, 1)

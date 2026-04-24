@@ -109,10 +109,14 @@ function NameEntry({ sessionId, onJoin, error }: { sessionId: string; onJoin: (n
   );
 }
 
-function Lobby({ session, userName, socket }: { 
+function Lobby({ session, userName, socket, activePanel, setActivePanel, handleToggleMic, isMuted }: { 
   session: NonNullable<ReturnType<typeof useSession>["session"]>; 
   userName: string;
   socket: any;
+  activePanel: "chat" | "mod" | null;
+  setActivePanel: (panel: "chat" | "mod" | null) => void;
+  handleToggleMic: () => void;
+  isMuted: boolean;
 }) {
   const others = session.participants.filter((p) => p.id !== undefined && p.name !== userName && p.role !== "host");
 
@@ -171,15 +175,39 @@ function Lobby({ session, userName, socket }: {
         </motion.div>
       </div>
       
-      <SessionControls session={session} socket={socket} userName={userName} isHost={false} onLeave={() => window.location.href = "/"} onBack={() => {}} />
+      <SessionControls 
+        session={session} 
+        socket={socket} 
+        userName={userName} 
+        isHost={false} 
+        onLeave={() => window.location.href = "/"} 
+        onBack={() => {}} 
+        showBar={false}
+        activePanel={activePanel}
+        setActivePanel={setActivePanel}
+      />
+      <SessionFloatingController 
+        isHost={false}
+        onLeaveSession={() => { window.location.href = "/"; }}
+        onToggleMic={handleToggleMic}
+        isMicMuted={isMuted}
+        onOpenChat={() => setActivePanel("chat")}
+      />
     </div>
   );
+
 }
 
-function ActivityView({ session, userName, socket }: {
+function ActivityView({ session, userName, socket, activePanel, setActivePanel, handleToggleMic, isMuted, handleToggleFullscreen, isFullscreen }: {
   session: NonNullable<ReturnType<typeof useSession>["session"]>;
   userName: string;
   socket: any;
+  activePanel: "chat" | "mod" | null;
+  setActivePanel: (panel: "chat" | "mod" | null) => void;
+  handleToggleMic: () => void;
+  isMuted: boolean;
+  handleToggleFullscreen: () => void;
+  isFullscreen: boolean;
 }) {
   const renderActivity = () => {
     const mode = session.mode;
@@ -211,6 +239,11 @@ function ActivityView({ session, userName, socket }: {
       </div>
     );
   };
+
+  const handleLeaveSession = useCallback(() => { window.location.href = "/"; }, []);
+  const handleOpenChat = useCallback(() => setActivePanel("chat"), []);
+
+
 
   return (
     <div className="h-[100dvh] bg-[#020617] flex flex-col relative text-white isolate overflow-hidden">
@@ -255,7 +288,30 @@ function ActivityView({ session, userName, socket }: {
         </AnimatePresence>
       </main>
 
-      <SessionControls session={session} socket={socket} userName={userName} isHost={false} onLeave={() => window.location.href = "/"} onBack={() => {}} />
+      {session && socket && (
+        <SessionControls 
+          session={session} 
+          socket={socket} 
+          userName={userName} 
+          isHost={false} 
+          onLeave={handleLeaveSession}
+          onBack={() => {}} 
+          showBar={false}
+          activePanel={activePanel}
+          setActivePanel={setActivePanel}
+        />
+      )}
+
+      <SessionFloatingController 
+        isHost={false}
+        onLeaveSession={handleLeaveSession}
+        onToggleMic={handleToggleMic}
+        isMicMuted={isMuted}
+        onOpenChat={handleOpenChat}
+        onTogglePin={handleToggleFullscreen}
+        isPinned={isFullscreen}
+      />
+
     </div>
   );
 }
@@ -270,6 +326,35 @@ function SessionContent() {
   const { socket, isConnected } = useSocket();
   const { session, error, isKicked, userId } = useSession(sessionId, userName, "participant");
   const [isRedirecting, setIsRedirecting] = useState(false);
+  const [activePanel, setActivePanel] = useState<"chat" | "mod" | null>(null);
+
+  const [isMuted, setIsMuted] = useState(false);
+  const [isFullscreen, setIsFullscreen] = useState(false);
+
+  useEffect(() => {
+    if (!session) return;
+    const me = session.participants.find(p => p.name === userName);
+    if (me && me.micOn === isMuted) {
+      setIsMuted(!me.micOn);
+    }
+  }, [session?.participants, userName]);
+
+  const handleToggleMic = useCallback(() => {
+    const newState = !isMuted;
+    setIsMuted(newState);
+    socket?.emit("voice:toggle", { sessionId, userName, micOn: !newState });
+  }, [isMuted, socket, sessionId, userName]);
+
+  const handleToggleFullscreen = useCallback(() => {
+    if (!document.fullscreenElement) {
+      document.documentElement.requestFullscreen();
+      setIsFullscreen(true);
+    } else {
+      document.exitFullscreen();
+      setIsFullscreen(false);
+    }
+  }, []);
+
 
   const safeNavigate = useCallback((target: string) => {
     if (isRedirecting) return;
@@ -325,10 +410,12 @@ function SessionContent() {
   }
 
   if (session.mode === "lobby") {
-    return <Lobby session={session} userName={userName} socket={socket} />;
+    return <Lobby session={session} userName={userName} socket={socket} activePanel={activePanel} setActivePanel={setActivePanel} handleToggleMic={handleToggleMic} isMuted={isMuted} />;
   }
 
-  return <ActivityView session={session} userName={userName} socket={socket} />;
+  return <ActivityView session={session} userName={userName} socket={socket} activePanel={activePanel} setActivePanel={setActivePanel} handleToggleMic={handleToggleMic} isMuted={isMuted} handleToggleFullscreen={handleToggleFullscreen} isFullscreen={isFullscreen} />;
+
+
 }
 
 export default function ParticipantSession() {
