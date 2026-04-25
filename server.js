@@ -1415,7 +1415,7 @@ app.prepare().then(() => {
     })
   })
 
-  server.listen(port, hostname, (err) => {
+  server.listen(port, '0.0.0.0', (err) => {
     if (err) throw err
     console.log(`> Ready on http://${hostname}:${port}`)
     console.log(`> Network access: http://<your-ip>:${port}`)
