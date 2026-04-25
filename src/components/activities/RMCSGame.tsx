@@ -5,6 +5,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { Shield, UserSearch, Crown, Scroll, Trophy, Users, AlertCircle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
+import { WinnerScreen } from './WinnerScreen';
 
 interface RMCSProps {
   session: any;
@@ -49,6 +50,18 @@ export default function RMCSGame({ session, socket, userName, isHost }: RMCSProp
           <p className="text-white/40 font-bold uppercase tracking-widest animate-pulse">Waiting for host to start...</p>
         </div>
       </div>
+    );
+  }
+
+  if (data.status === 'ended') {
+    return (
+      <WinnerScreen 
+        winnerName={data.winner}
+        rankings={data.players.sort((a: any, b: any) => b.score - a.score)}
+        onReturnToLobby={() => window.location.href = "/"}
+        isCurrentUserWinner={data.winner === userName}
+        gameName="Raja Mantri Chor Sipahi"
+      />
     );
   }
 

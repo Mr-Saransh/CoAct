@@ -4,6 +4,7 @@ import React, { useState, useEffect, useMemo, useRef } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { User, Users, Dice1 as DiceIcon, Crown, MessageSquare, Trophy, ChevronRight, Share2, Info } from "lucide-react";
+import { WinnerScreen } from "./WinnerScreen";
 
 // --- Types & Constants ---
 type LudoColor = "red" | "blue" | "yellow" | "green";
@@ -642,18 +643,13 @@ function LudoBoard({ session, socket, userName }: { session: SessionLike; socket
       </div>
 
       {state.winner && (
-        <div className="fixed inset-0 z-[100] bg-black/80 backdrop-blur-xl flex items-center justify-center p-6 animate-in fade-in duration-500">
-           <div className="w-full max-w-sm text-center space-y-6">
-              <div className="w-32 h-32 bg-yellow-400 rounded-full mx-auto flex items-center justify-center shadow-[0_0_50px_rgba(250,204,21,0.4)] animate-bounce">
-                 <Trophy className="w-16 h-16 text-black" />
-              </div>
-              <h2 className="text-5xl font-outfit font-black text-white tracking-tighter italic">VICTORY!</h2>
-              <p className="text-2xl font-bold text-white/80 uppercase tracking-widest">{state.winner} has won</p>
-              <Button onClick={() => window.location.href = "/"} className="w-full h-14 bg-white text-black font-black uppercase tracking-widest hover:bg-primary hover:text-white transition-all">
-                 Return Home
-              </Button>
-           </div>
-        </div>
+        <WinnerScreen 
+          winnerName={state.winner}
+          rankings={state.players.map(p => ({ name: p.name }))}
+          onReturnToLobby={() => window.location.href = "/"}
+          isCurrentUserWinner={state.winner === me}
+          gameName="Ludo Royale"
+        />
       )}
     </div>
   );

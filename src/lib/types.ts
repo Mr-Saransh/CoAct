@@ -1,5 +1,6 @@
 export interface Participant {
-  id: string;
+  id: string; // Socket ID (transient)
+  userId: string; // Durable ID (persistent)
   name: string;
   role: "host" | "participant";
   joinedAt: number;
@@ -18,12 +19,14 @@ export interface ChatMessage {
 
 export interface SessionState {
   id: string;
-  hostId: string;
+  hostId: string; // Durable Host User ID
   hostName: string;
-  mode: "lobby" | "poll" | "quiz" | "qa" | "fitb" | "board" | "focus" | "tasks" | "trivia" | "wordchain" | "mostlikely" | "study" | "uno" | "ludo" | "thoughtmap" | "courtroom" | "duel" | "decision" | "antakshari" | "rmcs";
+  hostStatus: "active" | "idle" | "offline";
+  mode: "lobby" | "poll" | "quiz" | "qa" | "fitb" | "board" | "focus" | "tasks" | "trivia" | "wordchain" | "mostlikely" | "study" | "uno" | "ludo" | "thoughtmap" | "courtroom" | "duel" | "decision" | "rmcs";
   status: "waiting" | "live" | "ended";
   activityData: Record<string, any>;
   participants: Participant[];
+  bannedParticipants: string[]; // List of userIds
   players: string[];
   spectators: string[];
   maxPlayers: number;

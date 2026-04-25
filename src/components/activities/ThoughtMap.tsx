@@ -3,7 +3,7 @@
 import React, { useState, useRef, useCallback, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { useSocket } from "@/components/providers/SocketProvider";
-import { Network, BrainCircuit, Maximize, Trash2, Link2, X, Palette } from "lucide-react";
+import { Network, BrainCircuit, Maximize, Trash2, Link2, X, Palette, ZoomIn, ZoomOut } from "lucide-react";
 
 interface ThoughtNode {
   id: string;
@@ -291,61 +291,56 @@ function SharedCanvas({
       />
 
       {/* Toolbar */}
-      <div className="absolute top-4 left-4 z-20 flex flex-wrap gap-2">
-        <Button
-          size="sm"
-          variant="secondary"
-          onClick={autoCluster}
-          className="bg-white/10 text-white hover:bg-white/20 border-white/10 backdrop-blur text-xs px-3 h-10"
-        >
-          <BrainCircuit className="w-4 h-4 mr-1.5" /> Auto-Cluster
-        </Button>
-        <Button
-          size="sm"
-          variant="secondary"
-          onClick={() => {
-            setPan({ x: 0, y: 0 });
-            setScale(1);
-          }}
-          className="bg-white/10 text-white hover:bg-white/20 border-white/10 backdrop-blur w-10 h-10 p-0"
-        >
-          <Maximize className="w-4 h-4" />
-        </Button>
-        <Button
-          size="sm"
-          variant={connectMode ? "default" : "secondary"}
-          onClick={() => {
-            setConnectMode(!connectMode);
-            setConnectFrom(null);
-          }}
-          className={`backdrop-blur text-xs px-3 h-10 ${
-            connectMode
+      <div className="absolute top-4 left-4 right-4 z-20 flex flex-wrap items-center justify-between gap-3 pointer-events-none">
+        <div className="flex flex-wrap gap-2 pointer-events-auto">
+          <Button
+            size="sm"
+            variant="secondary"
+            onClick={autoCluster}
+            className="bg-white/10 text-white hover:bg-white/20 border-white/10 backdrop-blur-xl text-[10px] font-bold uppercase tracking-widest px-4 h-10 rounded-xl transition-all hover:scale-105 active:scale-95"
+          >
+            <BrainCircuit className="w-4 h-4 mr-2" /> Organize
+          </Button>
+          <div className="flex bg-white/10 backdrop-blur rounded-xl p-1 border border-white/10">
+            <button onClick={() => setScale(s => Math.min(3, s * 1.2))} className="p-2 w-10 h-10 flex items-center justify-center text-white/60 hover:text-white" title="Zoom In"><ZoomIn className="w-4 h-4" /></button>
+            <button onClick={() => setScale(s => Math.max(0.2, s / 1.2))} className="p-2 w-10 h-10 flex items-center justify-center text-white/60 hover:text-white" title="Zoom Out"><ZoomOut className="w-4 h-4" /></button>
+            <button onClick={() => { setScale(1); setPan({ x: 0, y: 0 }); }} className="p-2 w-10 h-10 flex items-center justify-center text-white/60 hover:text-white" title="Reset View"><Maximize className="w-4 h-4" /></button>
+          </div>
+
+          <Button
+            size="sm"
+            variant={connectMode ? "default" : "secondary"}
+            onClick={() => {
+              setConnectMode(!connectMode);
+              setConnectFrom(null);
+            }}
+            className={`backdrop-blur text-xs px-3 h-10 ${connectMode
               ? "bg-violet-500 text-white hover:bg-violet-600"
               : "bg-white/10 text-white hover:bg-white/20 border-white/10"
-          }`}
-        >
-          <Link2 className="w-4 h-4 mr-1.5" /> {connectMode ? (connectFrom ? "Click target..." : "Click source...") : "Connect"}
-        </Button>
-      </div>
-
-      {/* Info */}
-      <div className="absolute top-4 right-4 z-20 flex items-center gap-2">
-        <div className="bg-white/10 backdrop-blur px-4 py-2 rounded-full border border-white/10 text-sm font-bold text-white">
-          {nodes.length} Ideas
-        </div>
-        <div className="bg-white/10 backdrop-blur px-3 py-2 rounded-full border border-white/10 text-xs text-white/60">
-          Double-tap to add
+            }`}
+          >
+            <Link2 className="w-4 h-4 mr-1.5" /> {connectMode ? (connectFrom ? "Click target..." : "Click source...") : "Connect"}
+          </Button>
         </div>
       </div>
 
-      {/* Canvas Layer */}
+      <div className="absolute bottom-4 right-4 z-20 flex flex-col sm:flex-row items-end sm:items-center gap-2 pointer-events-none">
+        <div className="flex gap-2">
+          <div className="bg-white/10 backdrop-blur-md px-4 py-2 rounded-full border border-white/10 text-[10px] sm:text-sm font-bold text-white shadow-xl pointer-events-auto">
+            {nodes.length} Ideas
+          </div>
+          <div className="bg-white/10 backdrop-blur-md px-3 py-2 rounded-full border border-white/10 text-[9px] sm:text-xs text-white/60 shadow-xl hidden xs:block pointer-events-auto">
+            Double-tap to add
+          </div>
+        </div>
+      </div>
+
       <div
         className="absolute inset-0 origin-top-left pointer-events-none"
         style={{
           transform: `translate(${pan.x}px, ${pan.y}px) scale(${scale})`,
         }}
       >
-        {/* Arrows/Connections */}
         <svg style={{ position: 'absolute', overflow: 'visible', width: '1px', height: '1px', left: 0, top: 0, pointerEvents: 'none' }}>
           {connections.map((conn) => {
             const from = getNodeCenter(conn.from);
@@ -354,12 +349,17 @@ function SharedCanvas({
             const dx = to.x - from.x;
             const dy = to.y - from.y;
             const angle = Math.atan2(dy, dx);
-            const len = Math.hypot(dx, dy);
-            // Arrow tip offset
             const tipX = to.x - Math.cos(angle) * 20;
             const tipY = to.y - Math.sin(angle) * 20;
             return (
               <g key={conn.id}>
+                {/* Glow Layer */}
+                <line
+                  x1={from.x} y1={from.y} x2={tipX} y2={tipY}
+                  stroke="#8b5cf6" strokeWidth={4} strokeOpacity={0.2}
+                  style={{ filter: 'blur(4px)' }}
+                />
+                {/* Core Line */}
                 <line
                   x1={from.x}
                   y1={from.y}
@@ -369,7 +369,11 @@ function SharedCanvas({
                   strokeWidth={2}
                   strokeDasharray="6,4"
                 />
-                {/* Arrowhead */}
+                <polygon
+                  points={`${tipX},${tipY} ${tipX - 10 * Math.cos(angle - 0.4)},${tipY - 10 * Math.sin(angle - 0.4)} ${tipX - 10 * Math.cos(angle + 0.4)},${tipY - 10 * Math.sin(angle + 0.4)}`}
+                  fill="#8b5cf6" fillOpacity={0.4}
+                  style={{ filter: 'blur(1px)' }}
+                />
                 <polygon
                   points={`${tipX},${tipY} ${tipX - 10 * Math.cos(angle - 0.4)},${tipY - 10 * Math.sin(angle - 0.4)} ${tipX - 10 * Math.cos(angle + 0.4)},${tipY - 10 * Math.sin(angle + 0.4)}`}
                   fill="rgba(255,255,255,0.4)"
@@ -379,7 +383,6 @@ function SharedCanvas({
           })}
         </svg>
 
-        {/* Nodes */}
         {nodes.map((node) => {
           const nc = getNodeColor(node.color);
           const isConnectSource = connectFrom === node.id;
@@ -405,19 +408,16 @@ function SharedCanvas({
                 }
               }}
             >
-              {/* Sticker Node */}
               <div
-                className="rounded-2xl p-4 shadow-lg border-2 relative group transition-shadow hover:shadow-xl"
+                className="rounded-2xl p-5 border shadow-2xl relative group transition-all"
                 style={{
                   backgroundColor: nc.bg,
-                  borderColor: `${nc.bg}88`,
-                  boxShadow: `0 4px 20px ${nc.bg}33, 0 8px 40px rgba(0,0,0,0.3)`,
+                  borderColor: `${nc.bg}aa`,
+                  boxShadow: `0 8px 32px -4px ${nc.bg}44, 0 16px 40px -8px rgba(0,0,0,0.4), inset 0 0 20px rgba(255,255,255,0.1)`,
                 }}
               >
-                {/* Sticker fold effect */}
                 <div
-                  className="absolute top-0 right-0 w-6 h-6 rounded-bl-xl"
-                  style={{ backgroundColor: `${nc.bg}cc`, boxShadow: `inset -2px 2px 4px rgba(0,0,0,0.1)` }}
+                  className="absolute top-0 right-0 w-8 h-8 rounded-bl-2xl bg-black/5 backdrop-blur-md border-l border-b border-white/5"
                 />
 
                 {editingNode === node.id ? (
@@ -440,13 +440,13 @@ function SharedCanvas({
                         setEditingNode(null);
                       }
                     }}
-                    className="w-full bg-transparent resize-none outline-none text-sm font-semibold"
+                    className="w-full bg-white/10 rounded-xl p-3 resize-none outline-none text-sm font-bold placeholder:text-black/20"
                     style={{ color: nc.text }}
-                    rows={2}
+                    rows={3}
                   />
                 ) : (
                   <p
-                    className="font-semibold text-sm leading-snug mb-3 break-words"
+                    className="font-bold text-sm leading-relaxed mb-4 break-words min-h-[44px]"
                     style={{ color: nc.text }}
                     onDoubleClick={() => {
                       setEditingNode(node.id);
@@ -457,19 +457,25 @@ function SharedCanvas({
                   </p>
                 )}
 
-                <div className="flex items-center justify-between">
-                  <span className="text-[9px] uppercase tracking-widest font-bold opacity-60" style={{ color: nc.text }}>
-                    {node.author}
-                  </span>
-                  <div className="flex items-center gap-2 opacity-100 md:opacity-0 group-hover:opacity-100 transition-opacity">
+                <div className="flex items-center justify-between border-t border-black/5 pt-3">
+                  <div className="flex items-center gap-2">
+                    <div className="w-5 h-5 rounded-full bg-black/10 flex items-center justify-center text-[10px] font-black uppercase" style={{ color: nc.text }}>
+                      {node.author[0]}
+                    </div>
+                    <span className="text-[10px] uppercase tracking-tighter font-black opacity-30" style={{ color: nc.text }}>
+                      {node.author}
+                    </span>
+                  </div>
+                  
+                  <div className="flex items-center gap-1 opacity-100 sm:opacity-0 group-hover:opacity-100 transition-all duration-200">
                     <button
                       onClick={(e) => {
                         e.stopPropagation();
                         setShowColorPicker(showColorPicker === node.id ? null : node.id);
                       }}
-                      className="w-7 h-7 rounded-full flex items-center justify-center hover:bg-black/10"
+                      className="p-1.5 rounded-lg hover:bg-black/10 transition-colors"
                     >
-                      <Palette className="w-4 h-4" style={{ color: nc.text }} />
+                      <Palette className="w-3.5 h-3.5" style={{ color: nc.text }} />
                     </button>
                     {(isHost || node.author === userName) && (
                       <button
@@ -477,17 +483,16 @@ function SharedCanvas({
                           e.stopPropagation();
                           deleteNode(node.id);
                         }}
-                        className="w-7 h-7 rounded-full flex items-center justify-center hover:bg-black/10"
+                        className="p-1.5 rounded-lg hover:bg-red-500/10 transition-colors"
                       >
-                        <Trash2 className="w-4 h-4" style={{ color: nc.text }} />
+                        <Trash2 className="w-3.5 h-3.5" style={{ color: nc.text }} />
                       </button>
                     )}
                   </div>
                 </div>
 
-                {/* Color picker dropdown */}
                 {showColorPicker === node.id && (
-                  <div className="absolute -bottom-14 left-0 flex gap-2 bg-black/80 backdrop-blur rounded-xl p-3 z-50 border border-white/10">
+                  <div className="absolute -bottom-16 left-0 right-0 flex justify-between bg-black/90 backdrop-blur-xl rounded-2xl p-2.5 z-50 border border-white/10 shadow-2xl animate-in fade-in slide-in-from-top-2">
                     {NODE_COLORS.map((c) => (
                       <button
                         key={c.bg}
@@ -496,7 +501,7 @@ function SharedCanvas({
                           socket.emit("thoughtmap:update_node", { sessionId, nodeId: node.id, color: c.bg });
                           setShowColorPicker(null);
                         }}
-                        className={`w-8 h-8 rounded-full border-2 ${node.color === c.bg ? "border-white" : "border-transparent"}`}
+                        className={`w-7 h-7 rounded-full border-2 transition-transform hover:scale-110 ${node.color === c.bg ? "border-white" : "border-transparent"}`}
                         style={{ backgroundColor: c.bg }}
                       />
                     ))}

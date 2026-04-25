@@ -218,7 +218,7 @@ export default function Home() {
             {[
               { icon: GraduationCap, title: "Classroom", desc: "Interactive whiteboards, real-time polls, and QA boards to drive engagement in learning environments.", color: "text-blue-400" },
               { icon: BookOpen, title: "Group Study", desc: "Co-working spaces with task trackers, focus timers, and shared notes for maximum productivity.", color: "text-green-400" },
-              { icon: Gamepad2, title: "Social Play", desc: "A collection of social games like Word Chain, Antakshari, and Ludo for bonding and ice-breaking.", color: "text-purple-400" },
+              { icon: Gamepad2, title: "Social Play", desc: "A collection of social games like Word Chain, UNO, and Ludo for bonding and ice-breaking.", color: "text-purple-400" },
               { icon: BrainCircuit, title: "Decision Making", desc: "Thought mapping, debate duels, and courtroom simulations to reach consensus through collaboration.", color: "text-orange-400" },
             ].map((feature, i) => (
               <div key={i} className="p-10 rounded-[2.5rem] bg-white/[0.02] border border-white/5 hover:border-white/10 transition-colors">

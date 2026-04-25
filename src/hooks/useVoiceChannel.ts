@@ -12,8 +12,6 @@ const AUDIO_CONSTRAINTS: MediaTrackConstraints = {
   echoCancellation: true,
   noiseSuppression: true,
   autoGainControl: true,
-  sampleRate: 48000,
-  channelCount: 1,
 };
 
 export function useVoiceChannel(
@@ -242,7 +240,13 @@ export function useVoiceChannel(
         });
 
         // Setup local speaker detection
-        const audioCtx = new AudioContext();
+        const AudioContextClass = (window as any).AudioContext || (window as any).webkitAudioContext;
+        if (!AudioContextClass) return;
+        
+        const audioCtx = new AudioContextClass();
+        if (audioCtx.state === 'suspended') {
+          await audioCtx.resume();
+        }
         audioCtxRef.current = audioCtx;
         const source = audioCtx.createMediaStreamSource(stream);
         const analyser = audioCtx.createAnalyser();
@@ -261,6 +265,10 @@ export function useVoiceChannel(
         checkSpeaking();
       } catch (err) {
         console.error("Failed to get microphone:", err);
+        // Alert if secure context issue
+        if (!window.isSecureContext) {
+          alert("Voice chat requires a secure context (HTTPS or localhost). Please check your connection.");
+        }
       }
     };
 
