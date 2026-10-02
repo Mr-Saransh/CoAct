@@ -461,17 +461,17 @@ function HostSessionContent() {
                 <p className="text-sm md:text-base text-white/60">Choose a mode to start your interactive session</p>
               </div>
 
-              {/* Category Cards */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6 mb-8">
+              {/* Category Cards - Responsive 2-column mobile, 4-column desktop */}
+              <div className="grid grid-cols-2 lg:grid-cols-4 gap-2.5 sm:gap-4 md:gap-6 mb-6 md:mb-8">
                 {(Object.entries(CATEGORY_INFO) as [keyof typeof ACTIVITIES, typeof CATEGORY_INFO['classroom']][]).map(([key, info]) => {
                   const isActive = activeCategory === key;
                   const IconComponent = info.icon;
                   
                   const themes = {
-                    blue: { border: "border-blue-500/50", glow: "shadow-[0_0_40px_rgba(59,130,246,0.15)]", text: "text-blue-400", bg: "bg-blue-500/10", active: "border-blue-500" },
-                    green: { border: "border-green-500/50", glow: "shadow-[0_0_40px_rgba(34,197,94,0.15)]", text: "text-green-400", bg: "bg-green-500/10", active: "border-green-500" },
-                    purple: { border: "border-purple-500/50", glow: "shadow-[0_0_40px_rgba(168,85,247,0.15)]", text: "text-purple-400", bg: "bg-purple-500/10", active: "border-purple-500" },
-                    orange: { border: "border-orange-500/50", glow: "shadow-[0_0_40px_rgba(249,115,22,0.15)]", text: "text-orange-400", bg: "bg-orange-500/10", active: "border-orange-500" },
+                    blue: { border: "border-blue-500/50", glow: "shadow-[0_0_30px_rgba(59,130,246,0.2)]", text: "text-blue-400", bg: "bg-blue-500/15", active: "border-blue-500" },
+                    green: { border: "border-green-500/50", glow: "shadow-[0_0_30px_rgba(34,197,94,0.2)]", text: "text-green-400", bg: "bg-green-500/15", active: "border-green-500" },
+                    purple: { border: "border-purple-500/50", glow: "shadow-[0_0_30px_rgba(168,85,247,0.2)]", text: "text-purple-400", bg: "bg-purple-500/15", active: "border-purple-500" },
+                    orange: { border: "border-orange-500/50", glow: "shadow-[0_0_30px_rgba(249,115,22,0.2)]", text: "text-orange-400", bg: "bg-orange-500/15", active: "border-orange-500" },
                   };
 
                   const theme = themes[info.color as keyof typeof themes];
@@ -479,27 +479,27 @@ function HostSessionContent() {
                   return (
                     <motion.div 
                       key={key} 
-                      whileHover={{ y: -4 }}
-                      whileTap={{ scale: 0.98 }}
+                      whileHover={{ y: -3 }}
+                      whileTap={{ scale: 0.97 }}
                       onClick={() => setActiveCategory(key)} 
-                      className={`relative rounded-[24px] md:rounded-[32px] p-4 md:p-6 cursor-pointer border transition-all duration-500 h-auto md:h-[220px] flex flex-row md:flex-col items-center md:items-start justify-start md:justify-between overflow-hidden group gap-4 md:gap-0
+                      className={`relative rounded-2xl sm:rounded-3xl md:rounded-[32px] p-3 sm:p-4 md:p-6 cursor-pointer border transition-all duration-300 min-h-[96px] sm:min-h-[120px] md:h-[220px] flex flex-col justify-between overflow-hidden group
                         ${isActive 
-                          ? `${theme.active} ${theme.glow} bg-white/[0.05] scale-[1.02]` 
+                          ? `${theme.active} ${theme.glow} bg-white/[0.08] scale-[1.01]` 
                           : "border-white/10 hover:border-white/20 bg-white/[0.02]"
                         } backdrop-blur-3xl`}
                     >
                       {/* Glass Highlight */}
                       <div className="absolute top-0 left-0 w-full h-1/2 bg-gradient-to-b from-white/[0.05] to-transparent pointer-events-none" />
                       
-                      <div className="relative z-10 flex flex-row md:flex-col items-center md:items-start gap-4 md:gap-0 w-full">
-                        <div className={`w-10 h-10 md:w-12 md:h-12 rounded-full flex items-center justify-center md:mb-5 transition-all duration-300 shrink-0 ${isActive ? theme.bg : "bg-white/5"} group-hover:scale-110`}>
-                          <IconComponent className={`w-5 h-5 md:w-6 md:h-6 ${isActive ? theme.text : "text-white/40"}`} />
+                      <div className="relative z-10 flex flex-col items-start w-full">
+                        <div className={`w-9 h-9 sm:w-11 sm:h-11 md:w-12 md:h-12 rounded-xl sm:rounded-full flex items-center justify-center mb-2 sm:mb-3 md:mb-5 transition-all duration-300 shrink-0 ${isActive ? theme.bg : "bg-white/5"} group-hover:scale-105`}>
+                          <IconComponent className={`w-4 h-4 sm:w-5 sm:h-5 md:w-6 md:h-6 ${isActive ? theme.text : "text-white/40"}`} />
                         </div>
                         <div className="flex flex-col">
-                          <h3 className="text-xl md:text-2xl font-bold text-white md:mb-2 tracking-tight">
+                          <h3 className="text-sm sm:text-lg md:text-2xl font-bold text-white tracking-tight leading-tight">
                             {info.title}
                           </h3>
-                          <p className="hidden md:block text-sm text-white/50 leading-relaxed line-clamp-2 font-medium">{info.desc}</p>
+                          <p className="hidden md:block text-sm text-white/50 leading-relaxed line-clamp-2 font-medium mt-1">{info.desc}</p>
                         </div>
                       </div>
 
@@ -513,15 +513,15 @@ function HostSessionContent() {
               </div>
 
               {/* Selected Category Area */}
-              <div className={`border rounded-[32px] md:rounded-[40px] p-4 md:p-8 mb-8 flex-1 transition-all duration-500 glass-card
+              <div className={`border rounded-2xl md:rounded-[40px] p-3.5 sm:p-6 md:p-8 mb-8 flex-1 transition-all duration-500 glass-card
                 ${activeCategory === 'classroom' ? 'border-blue-500/30 shadow-[0_0_50px_rgba(59,130,246,0.1)]' : 
                   activeCategory === 'study' ? 'border-green-500/30 shadow-[0_0_50px_rgba(34,197,94,0.1)]' : 
                   activeCategory === 'play' ? 'border-purple-500/30 shadow-[0_0_50px_rgba(168,85,247,0.1)]' : 
                   'border-orange-500/30 shadow-[0_0_50px_rgba(249,115,22,0.1)]'} bg-white/[0.02] backdrop-blur-3xl`}
               >
-                <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 mb-8 md:mb-10">
-                  <div className="flex items-center gap-4 md:gap-6">
-                    <div className={`w-16 h-16 rounded-[24px] flex items-center justify-center transition-all duration-500
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 md:gap-6 mb-6 md:mb-10">
+                  <div className="flex items-center gap-3 sm:gap-4 md:gap-6">
+                    <div className={`w-11 h-11 sm:w-14 sm:h-14 md:w-16 md:h-16 rounded-xl sm:rounded-2xl md:rounded-[24px] flex items-center justify-center transition-all duration-500 shrink-0
                       ${activeCategory === 'classroom' ? 'bg-blue-500/20 text-blue-400' : 
                         activeCategory === 'study' ? 'bg-green-500/20 text-green-400' : 
                         activeCategory === 'play' ? 'bg-purple-500/20 text-purple-400' : 
@@ -529,18 +529,18 @@ function HostSessionContent() {
                     >
                       {(() => {
                         const Icon = CATEGORY_INFO[activeCategory].icon;
-                        return <Icon className="w-10 h-10" />;
+                        return <Icon className="w-5 h-5 sm:w-7 sm:h-7 md:w-10 md:h-10" />;
                       })()}
                     </div>
                     <div>
-                      <h2 className="text-2xl md:text-3xl font-black text-white tracking-tight">
+                      <h2 className="text-lg sm:text-2xl md:text-3xl font-black text-white tracking-tight">
                         {CATEGORY_INFO[activeCategory].title}
                       </h2>
-                      <p className="text-sm md:text-lg text-white/50 font-medium">{CATEGORY_INFO[activeCategory].desc}</p>
+                      <p className="text-xs sm:text-sm md:text-lg text-white/50 font-medium">{CATEGORY_INFO[activeCategory].desc}</p>
                     </div>
                   </div>
-                  <button className="w-fit flex items-center gap-2 px-4 py-2 md:px-6 md:py-3 rounded-full border border-white/10 text-white/80 hover:bg-white/5 hover:border-white/20 transition-all font-bold tracking-wide text-sm md:text-base">
-                    <HelpCircle className="w-4 h-4 md:w-5 md:h-5" /> How it works
+                  <button className="w-fit flex items-center gap-1.5 sm:gap-2 px-3 py-1.5 sm:px-4 sm:py-2 md:px-6 md:py-3 rounded-full border border-white/10 text-white/80 hover:bg-white/5 hover:border-white/20 transition-all font-bold tracking-wide text-xs sm:text-sm md:text-base cursor-pointer">
+                    <HelpCircle className="w-3.5 h-3.5 sm:w-4 sm:h-4 md:w-5 md:h-5" /> How it works
                   </button>
                 </div>
 

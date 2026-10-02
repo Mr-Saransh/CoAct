@@ -13,11 +13,21 @@ const handle = app.getRequestHandler()
 
 app.prepare().then(() => {
   const io = new Server(server, { 
-    cors: { origin: '*', methods: ['GET', 'POST'] }
+    cors: { origin: '*', methods: ['GET', 'POST'] },
+    pingInterval: 15000,
+    pingTimeout: 10000,
   })
 
   server.on('request', (req, res) => {
     const reqUrl = new URL(req.url || '/', `http://${hostname}:${port}`)
+    if (reqUrl.pathname === '/health' || reqUrl.pathname === '/healthz') {
+      res.writeHead(200, {
+        'Content-Type': 'application/json',
+        'Cache-Control': 'no-cache, no-store, must-revalidate',
+      })
+      res.end(JSON.stringify({ status: 'ok' }))
+      return
+    }
     if (reqUrl.pathname.startsWith('/socket.io/')) return
     handle(req, res)
   })
@@ -27,6 +37,38 @@ app.prepare().then(() => {
   const unoTimers = new Map()
   const wordChainTimers = new Map()
   const ludoPity = new Map() // sessionId -> { playerName -> nonSixCount }
+
+  // Periodic stale participant cleanup (heartbeat resilience)
+  const STALE_PARTICIPANT_TIMEOUT_MS = 90 * 1000 // 90 seconds
+  setInterval(() => {
+    const now = Date.now()
+    for (const [sessionId, session] of sessions.entries()) {
+      let stateChanged = false
+      const remainingParticipants = []
+
+      for (const p of session.participants) {
+        // Keep host even if temporarily offline
+        if (p.userId === session.hostId) {
+          remainingParticipants.push(p)
+          continue
+        }
+        // If disconnected for more than 90s, prune ghost participant
+        if (!p.isConnected && p.disconnectedAt && (now - p.disconnectedAt > STALE_PARTICIPANT_TIMEOUT_MS)) {
+          console.log(`  🧹 Pruning stale participant ${p.name} from session ${sessionId}`)
+          session.players = session.players.filter(n => n !== p.name)
+          session.spectators = session.spectators.filter(n => n !== p.name)
+          stateChanged = true
+        } else {
+          remainingParticipants.push(p)
+        }
+      }
+
+      if (stateChanged) {
+        session.participants = remainingParticipants
+        broadcastState(sessionId)
+      }
+    }
+  }, 30000)
 
   function broadcastState(sessionId) {
     const s = sessions.get(sessionId)
@@ -307,6 +349,7 @@ app.prepare().then(() => {
         existingP.id = socket.id
         existingP.name = name // update name if changed
         existingP.isConnected = true
+        delete existingP.disconnectedAt
         // Ensure role is correct if they are the owner
         if (session.hostId === userId) {
           existingP.role = 'host'
@@ -1420,7 +1463,10 @@ app.prepare().then(() => {
       socket.to(sessionId).emit('voice:leave', socket.id)
 
       const p = session.participants.find(p => p.userId === userId && p.id === socket.id)
-      if (p) p.isConnected = false
+      if (p) {
+        p.isConnected = false
+        p.disconnectedAt = Date.now()
+      }
 
       if (session.hostId === userId) {
         session.hostStatus = 'offline'

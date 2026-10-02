@@ -2,9 +2,10 @@ import React, { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
-import { Plus, X, Trash2, Check, BarChart3, Trophy, ArrowRight, Play } from "lucide-react";
+import { Plus, X, Trash2, Check, BarChart3, Trophy, ArrowRight, Play, Upload } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { WinnerScreen } from "./WinnerScreen";
+import { QuizImportModal } from "./QuizImportModal";
 
 export function QuizHost({ session, updateActivity }: { session: any; updateActivity: any }) {
   const activityData = session.activityData || {
@@ -19,6 +20,16 @@ export function QuizHost({ session, updateActivity }: { session: any; updateActi
   const [questions, setQuestions] = useState<any[]>(activityData.questions?.length ? activityData.questions : [
     { q: "", options: ["", ""], correct: 0, time: 20 }
   ]);
+  const [isImportModalOpen, setIsImportModalOpen] = useState(false);
+
+  const handleImportQuestions = (imported: Array<{ q: string; options: string[]; correct: number; time: number }>) => {
+    // If only 1 initial blank question exists, replace it, otherwise append
+    if (questions.length === 1 && !questions[0].q.trim()) {
+      setQuestions(imported);
+    } else {
+      setQuestions([...questions, ...imported]);
+    }
+  };
 
   const handlePublish = () => {
     const validQuestions = questions.filter(q => q.q.trim() && q.options.filter((o: string) => o.trim()).length >= 2);
@@ -134,6 +145,22 @@ export function QuizHost({ session, updateActivity }: { session: any; updateActi
           <h2 className="text-5xl font-black italic tracking-tighter mb-4">Quiz Battle</h2>
           <p className="text-white/40 uppercase font-bold tracking-widest text-xs">Configure your questions and timer</p>
         </div>
+        {/* Actions bar: Question count & Import button */}
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-white/[0.03] border border-white/10 p-4 rounded-2xl">
+          <div className="flex items-center gap-2">
+            <span className="text-xs font-bold uppercase tracking-wider text-white/50">
+              {questions.length} Question{questions.length !== 1 ? "s" : ""}
+            </span>
+          </div>
+          <Button
+            type="button"
+            variant="outline"
+            onClick={() => setIsImportModalOpen(true)}
+            className="h-10 px-4 rounded-xl border-cyan-500/40 bg-cyan-500/10 text-cyan-400 hover:bg-cyan-500/20 hover:border-cyan-500 font-bold text-xs tracking-wider flex items-center justify-center gap-2 transition-all cursor-pointer shadow-[0_0_20px_rgba(6,182,212,0.15)]"
+          >
+            <Upload className="w-4 h-4" /> Import Questions (PDF / Word)
+          </Button>
+        </div>
 
         {questions.map((q, qIndex) => (
           <Card key={qIndex} className="border-white/10 bg-[#121826]/80 backdrop-blur-xl rounded-[2rem] overflow-hidden">
@@ -208,12 +235,34 @@ export function QuizHost({ session, updateActivity }: { session: any; updateActi
           </Card>
         ))}
 
-        <Button variant="outline" onClick={addQuestion} className="w-full border-dashed border-white/20 bg-transparent hover:bg-white/5 h-16 rounded-[1.5rem] text-white/40 font-bold uppercase tracking-[0.2em] text-xs">
-          <Plus className="w-4 h-4 mr-2" /> Add New Question
-        </Button>
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <Button 
+            type="button"
+            variant="outline" 
+            onClick={addQuestion} 
+            className="w-full border-dashed border-white/20 bg-transparent hover:bg-white/5 h-16 rounded-[1.5rem] text-white/60 hover:text-white font-bold uppercase tracking-[0.2em] text-xs flex items-center justify-center gap-2 cursor-pointer transition-all"
+          >
+            <Plus className="w-4 h-4 mr-2" /> Add Question Manually
+          </Button>
+
+          <Button 
+            type="button"
+            variant="outline" 
+            onClick={() => setIsImportModalOpen(true)} 
+            className="w-full border-dashed border-cyan-500/30 bg-cyan-500/5 hover:bg-cyan-500/15 h-16 rounded-[1.5rem] text-cyan-400 font-bold uppercase tracking-[0.2em] text-xs flex items-center justify-center gap-2 cursor-pointer shadow-[0_0_20px_rgba(6,182,212,0.08)] transition-all"
+          >
+            <Upload className="w-4 h-4 mr-2" /> Import from PDF / Word
+          </Button>
+        </div>
+
+        <QuizImportModal
+          isOpen={isImportModalOpen}
+          onClose={() => setIsImportModalOpen(false)}
+          onImportQuestions={handleImportQuestions}
+        />
 
         <div className="fixed bottom-0 left-0 right-0 p-6 bg-[#020617]/90 backdrop-blur-2xl border-t border-white/10 flex justify-center z-50">
-          <Button onClick={handlePublish} className="w-full max-w-md bg-yellow-500 hover:bg-yellow-600 text-black font-black uppercase tracking-[0.3em] h-16 rounded-2xl text-xs shadow-[0_0_40px_rgba(250,204,21,0.3)] transition-all active:scale-95">
+          <Button onClick={handlePublish} className="w-full max-w-md bg-yellow-500 hover:bg-yellow-600 text-black font-black uppercase tracking-[0.3em] h-16 rounded-2xl text-xs shadow-[0_0_40px_rgba(250,204,21,0.3)] transition-all active:scale-95 cursor-pointer">
             <Play className="w-5 h-5 mr-2" /> Start Quiz Battle
           </Button>
         </div>

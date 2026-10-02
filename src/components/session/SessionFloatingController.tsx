@@ -63,13 +63,13 @@ export const SessionFloatingController = React.memo(({
     <motion.div
       drag
       dragMomentum={false}
-      dragElastic={0.1}
+      dragElastic={0.05}
       initial={{ x: 0, y: 0 }}
-      className="fixed z-[1000] touch-none right-6 bottom-6"
+      className="fixed z-[1000] touch-none right-4 sm:right-6 bottom-[calc(max(env(safe-area-inset-bottom,0px),1rem)+1.25rem)] sm:bottom-6"
       onDragStart={handleInteraction}
       onDrag={handleInteraction}
     >
-      <div className="relative flex items-center flex-row-reverse">
+      <div className="relative flex flex-col-reverse sm:flex-row-reverse items-end sm:items-center gap-2">
         <AnimatePresence mode="wait">
           {!isOpen ? (
             <motion.button
@@ -78,39 +78,48 @@ export const SessionFloatingController = React.memo(({
               animate={{ scale: 1, rotate: 0 }}
               exit={{ scale: 0, rotate: 180 }}
               onClick={() => setIsOpen(true)}
-              className="w-12 h-12 bg-black/80 backdrop-blur-xl border border-white/10 rounded-full flex items-center justify-center text-white/70 hover:text-white hover:bg-black transition-colors shadow-2xl group"
+              className="w-12 h-12 bg-black/85 backdrop-blur-2xl border border-white/15 rounded-full flex items-center justify-center text-white/80 hover:text-white hover:bg-black transition-all shadow-[0_4px_24px_rgba(0,0,0,0.6)] group active:scale-95 cursor-pointer"
+              aria-label="Open Session Controls"
             >
-              <Settings className="w-6 h-6 group-hover:rotate-45 transition-transform" />
+              <Settings className="w-5 h-5 sm:w-6 sm:h-6 group-hover:rotate-45 transition-transform" />
             </motion.button>
           ) : (
             <motion.div
               key="expanded"
-              initial={{ width: 48, opacity: 0, scale: 0.8 }}
-              animate={{ width: "auto", opacity: 1, scale: 1 }}
-              exit={{ width: 48, opacity: 0, scale: 0.8 }}
-              className="bg-[#0A0D14]/95 backdrop-blur-3xl border border-white/10 rounded-full px-2 py-2 flex items-center gap-1.5 shadow-[0_0_80px_rgba(0,0,0,0.8)] border-t-white/20"
+              initial={{ opacity: 0, scale: 0.85, y: 15 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.85, y: 15 }}
+              transition={{ duration: 0.22, ease: "easeOut" }}
+              className="bg-[#0A0D14]/95 backdrop-blur-3xl border border-white/15 rounded-2xl sm:rounded-full p-1.5 sm:p-2 flex flex-col-reverse sm:flex-row-reverse items-center gap-1.5 shadow-[0_12px_48px_rgba(0,0,0,0.85)] border-t-white/20"
               onPointerDown={handleInteraction}
             >
-              <div className="flex items-center gap-1 px-0.5">
+              <div className="flex flex-col-reverse sm:flex-row items-center gap-1">
                 <button 
                   onClick={(e) => {
                     e.stopPropagation();
-                    if (isHost && onExitActivity) {
+                    setIsOpen(false);
+                  }}
+                  className="w-11 h-11 sm:w-12 sm:h-12 rounded-full flex items-center justify-center text-white/50 hover:text-white bg-white/5 hover:bg-white/10 transition-all cursor-pointer"
+                  title="Close Controls"
+                >
+                  <ChevronLeft className="w-5 h-5 -rotate-90 sm:rotate-0" />
+                </button>
+
+                {isHost && onExitActivity && (
+                  <button 
+                    onClick={(e) => {
+                      e.stopPropagation();
                       onExitActivity();
                       setIsOpen(false);
-                    } else if (!isHost) {
-                      setIsOpen(false);
-                    }
-                  }}
-                  className={`w-12 h-12 rounded-full flex items-center justify-center bg-white/10 transition-all ${
-                    isHost ? "text-white shadow-[0_0_20px_rgba(6,182,212,0.3)] ring-1 ring-cyan-500/50" : "text-white/20"
-                  }`}
-                  title={isHost ? "Exit Activity" : "Close"}
-                >
-                  <ArrowLeft className="w-5 h-5" />
-                </button>
+                    }}
+                    className="w-11 h-11 sm:w-12 sm:h-12 rounded-full flex items-center justify-center bg-cyan-500/20 text-cyan-300 shadow-[0_0_20px_rgba(6,182,212,0.3)] ring-1 ring-cyan-500/50 hover:bg-cyan-500/30 transition-all cursor-pointer"
+                    title="Exit Activity to Lobby"
+                  >
+                    <ArrowLeft className="w-5 h-5" />
+                  </button>
+                )}
                 
-                <div className="w-px h-6 bg-white/10 mx-1" />
+                <div className="h-px w-6 sm:h-6 sm:w-px bg-white/10 my-0.5 sm:my-0 sm:mx-1" />
 
                 <ControllerButton 
                   icon={isMicMuted ? MicOff : Mic} 
@@ -146,14 +155,14 @@ export const SessionFloatingController = React.memo(({
                   onInteraction={handleInteraction}
                 />
 
-                <div className="w-px h-6 bg-white/10 mx-1" />
+                <div className="h-px w-6 sm:h-6 sm:w-px bg-white/10 my-0.5 sm:my-0 sm:mx-1" />
 
                 <button 
                   onClick={(e) => {
                     e.stopPropagation();
                     isHost ? onEndSession?.() : onLeaveSession?.();
                   }}
-                  className="w-12 h-12 rounded-full flex items-center justify-center text-red-400/60 hover:text-red-400 hover:bg-red-500/10 transition-all"
+                  className="w-11 h-11 sm:w-12 sm:h-12 rounded-full flex items-center justify-center text-red-400/60 hover:text-red-400 hover:bg-red-500/10 transition-all cursor-pointer"
                   title={isHost ? "End Session" : "Leave Session"}
                   onPointerDown={handleInteraction}
                 >
@@ -178,7 +187,7 @@ function ControllerButton({
 }: { 
   icon: any; 
   onClick?: () => void; 
-  active?: boolean;
+  active?: boolean; 
   activeColor?: string;
   label: string;
   onInteraction?: () => void;
@@ -190,7 +199,7 @@ function ControllerButton({
         onInteraction?.();
         onClick?.();
       }}
-      className={`w-12 h-12 rounded-full flex items-center justify-center transition-all ${
+      className={`w-11 h-11 sm:w-12 sm:h-12 rounded-full flex items-center justify-center transition-all cursor-pointer ${
         active ? `${activeColor} bg-white/10 shadow-[inset_0_0_15px_rgba(6,182,212,0.15)]` : "text-white/40 hover:text-white hover:bg-white/5"
       }`}
       title={label}

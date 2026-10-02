@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { Inter, Outfit } from "next/font/google";
 import "./globals.css";
 import { SocketProvider } from "@/components/providers/SocketProvider";
@@ -19,6 +19,14 @@ export const metadata: Metadata = {
   icons: {
     icon: "/logo.png",
   },
+};
+
+export const viewport: Viewport = {
+  width: "device-width",
+  initialScale: 1,
+  maximumScale: 1,
+  viewportFit: "cover",
+  themeColor: "#0B0E14",
 };
 
 export default function RootLayout({

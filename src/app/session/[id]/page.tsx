@@ -8,7 +8,7 @@ import { useSocket } from "@/components/providers/SocketProvider";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { WifiOff, ArrowRight, Users, MessageCircle, Mic, ShieldOff } from "lucide-react";
+import { WifiOff, ArrowRight, Users, MessageCircle, Mic, ShieldOff, AlertTriangle } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ThinkingBoard } from "@/components/activities/ThinkingBoard";
@@ -385,26 +385,47 @@ function SessionContent() {
 
   if (!isConnected || !session) {
     return (
-      <div className="min-h-[100dvh] bg-[#020617] p-8 flex flex-col items-center justify-center space-y-6">
-        <Skeleton className="w-20 h-20 rounded-full" />
-        <div className="space-y-2 w-full max-w-xs">
-          <Skeleton className="h-6 w-3/4 mx-auto" />
-          <Skeleton className="h-4 w-1/2 mx-auto" />
+      <div className="min-h-[100dvh] bg-[#020617] p-6 flex flex-col items-center justify-center space-y-6 text-white text-center">
+        <div className="relative">
+          <div className="w-16 h-16 rounded-2xl bg-cyan-500/10 border border-cyan-500/30 flex items-center justify-center animate-pulse">
+            <Users className="w-8 h-8 text-cyan-400" />
+          </div>
+          <span className="absolute -top-1 -right-1 flex h-3 w-3">
+            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-cyan-400 opacity-75"></span>
+            <span className="relative inline-flex rounded-full h-3 w-3 bg-cyan-500"></span>
+          </span>
         </div>
-        <div className="grid grid-cols-2 gap-4 w-full max-w-sm mt-8">
-          <Skeleton className="h-12 rounded-xl" />
-          <Skeleton className="h-12 rounded-xl" />
+        <div className="space-y-1.5 max-w-xs">
+          <h2 className="text-xl font-bold tracking-tight">Joining session...</h2>
+          <p className="text-xs text-white/50 font-medium">Connecting to workspace <span className="text-cyan-400 font-mono font-bold tracking-wider">{sessionId}</span></p>
         </div>
       </div>
     );
   }
 
   if (error) {
+    let friendlyTitle = "Unable to Join";
+    let friendlyMessage = error;
+    const lower = error.toLowerCase();
+    if (lower.includes("not found")) {
+      friendlyTitle = "Session Not Found";
+      friendlyMessage = "That session doesn't exist or has already ended.";
+    } else if (lower.includes("banned")) {
+      friendlyTitle = "Access Denied";
+      friendlyMessage = "You don't have permission to join this session.";
+    } else if (lower.includes("ended")) {
+      friendlyTitle = "Session Ended";
+      friendlyMessage = "This interactive session has concluded.";
+    }
+
     return (
-      <div className="min-h-[100dvh] flex flex-col items-center justify-center bg-[#020617] p-4 text-white text-center isolate">
-        <h2 className="text-2xl font-bold mb-2 uppercase italic tracking-tighter">Connection Lost</h2>
-        <p className="text-white/40 text-sm mb-4 font-medium">{error}</p>
-        <button onClick={() => window.location.href = "/"} className="px-8 h-12 bg-primary text-black font-black uppercase rounded-xl touch-manipulation">Exit</button>
+      <div className="min-h-[100dvh] flex flex-col items-center justify-center bg-[#020617] p-6 text-white text-center isolate">
+        <div className="w-14 h-14 rounded-2xl bg-red-500/10 border border-red-500/20 flex items-center justify-center mx-auto mb-4 text-red-400">
+          <AlertTriangle className="w-7 h-7" />
+        </div>
+        <h2 className="text-2xl font-bold mb-2 tracking-tight">{friendlyTitle}</h2>
+        <p className="text-white/50 text-sm max-w-sm mb-6 font-medium leading-relaxed">{friendlyMessage}</p>
+        <button onClick={() => window.location.href = "/"} className="px-6 h-11 bg-primary text-black font-bold uppercase tracking-wider text-xs rounded-xl touch-manipulation hover:bg-primary/90 transition-all cursor-pointer">Return Home</button>
       </div>
     );
   }
