@@ -1,10 +1,9 @@
 import React, { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Card, CardContent } from "@/components/ui/card";
 import { ArrowLeft, LogOut, Mic, MicOff, MessageSquare, Shield, Send, Users, UserMinus, Pin, X, Volume2 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
-import { useVoiceChannel } from "@/hooks/useVoiceChannel";
+import { useVoiceChannel, VoiceState } from "@/hooks/useVoiceChannel";
 
 export function SessionControls({ 
   session, 
@@ -13,9 +12,12 @@ export function SessionControls({
   isHost, 
   onLeave, 
   onBack,
-  showBar = true,
+  showBar = false,
   activePanel = null,
-  setActivePanel = () => {}
+  setActivePanel = () => {},
+  isMicMuted,
+  onToggleMic,
+  onVoiceStateChange
 }: { 
   session: any; 
   socket: any; 
@@ -26,17 +28,25 @@ export function SessionControls({
   showBar?: boolean;
   activePanel?: "chat" | "mod" | null;
   setActivePanel?: (panel: "chat" | "mod" | null) => void;
+  isMicMuted?: boolean;
+  onToggleMic?: () => void;
+  onVoiceStateChange?: (state: VoiceState, isSpeaking: boolean) => void;
 }) {
   const [internalActivePanel, setInternalActivePanel] = useState<"chat" | "mod" | null>(null);
   const currentActivePanel = activePanel !== undefined ? activePanel : internalActivePanel;
   const currentSetActivePanel = activePanel !== undefined ? setActivePanel : setInternalActivePanel;
 
   const [message, setMessage] = useState("");
-  const [voiceActive, setVoiceActive] = useState(false);
-  const [audioUnlocked, setAudioUnlocked] = useState(false);
+  const [internalVoiceActive, setInternalVoiceActive] = useState(false);
+  const voiceActive = isMicMuted !== undefined ? !isMicMuted : internalVoiceActive;
   const [isFullscreen, setIsFullscreen] = useState(false);
   
-  const { peers, isSpeaking } = useVoiceChannel(session?.id, socket, userName, voiceActive);
+  // High-performance voice channel hook managing WebRTC audio pipeline directly
+  const { peers, isSpeaking, voiceState } = useVoiceChannel(session?.id, socket, userName, voiceActive);
+
+  useEffect(() => {
+    onVoiceStateChange?.(voiceState, isSpeaking);
+  }, [voiceState, isSpeaking, onVoiceStateChange]);
 
   const me = session?.participants?.find((p: any) => p.userId === localStorage.getItem("coact_user_id"));
   const isMutedByHost = me?.mutedByHost;
@@ -46,24 +56,43 @@ export function SessionControls({
   // Sync voiceActive with session state
   useEffect(() => {
     if (!session) return;
-    if (me && me.micOn !== voiceActive) {
-      setVoiceActive(me.micOn);
+    if (me && me.micOn !== undefined && me.micOn !== voiceActive && isMicMuted === undefined) {
+      setInternalVoiceActive(me.micOn);
     }
-  }, [session?.participants, userName]);
+  }, [session?.participants, userName, me, voiceActive, isMicMuted]);
 
-  // Do NOT auto-enable mic for any mode — let users choose
-  // Host can force-mute/unmute via moderation panel
+  const [hostMutedNotice, setHostMutedNotice] = useState(false);
+
+  // If host muted this participant while mic is on, enforce mute immediately
+  useEffect(() => {
+    if (isMutedByHost && voiceActive) {
+      setHostMutedNotice(true);
+      if (onToggleMic) {
+        onToggleMic();
+      } else {
+        setInternalVoiceActive(false);
+        socket.emit("voice:toggle", { sessionId: session?.id, userName, micOn: false });
+      }
+      const t = setTimeout(() => setHostMutedNotice(false), 4000);
+      return () => clearTimeout(t);
+    }
+  }, [isMutedByHost, voiceActive, onToggleMic, socket, session?.id, userName]);
 
   if (!session) return null;
 
   const toggleVoice = () => {
     if (isMutedByHost) {
-      alert("You have been muted by the host.");
+      setHostMutedNotice(true);
+      setTimeout(() => setHostMutedNotice(false), 3000);
       return;
     }
-    const newState = !voiceActive;
-    setVoiceActive(newState);
-    socket.emit("voice:toggle", { sessionId: session.id, userName, micOn: newState });
+    if (onToggleMic) {
+      onToggleMic();
+    } else {
+      const newState = !voiceActive;
+      setInternalVoiceActive(newState);
+      socket.emit("voice:toggle", { sessionId: session.id, userName, micOn: newState });
+    }
   };
 
   const sendMessage = () => {
@@ -76,7 +105,6 @@ export function SessionControls({
     currentSetActivePanel(currentActivePanel === panel ? null : panel);
   };
 
-
   const kickUser = (targetUserId: string, targetName: string) => {
     if (confirm(`Remove and BAN ${targetName} from the session? They won't be able to rejoin unless you unban them.`)) {
       socket.emit("mod:kick", { sessionId: session.id, targetUserId });
@@ -85,18 +113,6 @@ export function SessionControls({
 
   const unbanUser = (targetUserId: string) => {
     socket.emit("mod:unban", { sessionId: session.id, targetUserId });
-  };
-
-  const toggleFullscreen = () => {
-    if (!document.fullscreenElement) {
-      document.documentElement.requestFullscreen().catch(err => {
-        console.error(`Error attempting to enable full-screen mode: ${err.message}`);
-      });
-      setIsFullscreen(true);
-    } else {
-      document.exitFullscreen();
-      setIsFullscreen(false);
-    }
   };
 
   const promoteToHost = (targetId: string, targetName: string) => {
@@ -115,12 +131,13 @@ export function SessionControls({
 
   return (
     <>
-      {/* Floating Draggable Control Bar */}
+      {/* Floating Draggable Control Bar (legacy fallback if showBar is explicitly true) */}
       {showBar && (
         <motion.div 
           drag
           dragMomentum={false}
           dragElastic={0}
+          dragConstraints={{ left: -320, right: 320, top: -500, bottom: 20 }}
           whileDrag={{ scale: 1.02, cursor: "grabbing" }}
           className={`fixed ${isFocusMode ? 'bottom-4 right-4 translate-x-0 left-auto' : 'bottom-4 md:bottom-12 left-1/2 -translate-x-1/2'} z-[100] flex items-center gap-1.5 md:gap-3 bg-black/40 backdrop-blur-[32px] border border-white/10 px-3 py-2 md:px-6 md:py-4 rounded-[2rem] md:rounded-[2.5rem] shadow-[0_32px_64px_-12px_rgba(0,0,0,0.6)] cursor-grab touch-none select-none pointer-events-auto ring-1 ring-white/10 transition-all duration-500`}
         >
@@ -194,6 +211,7 @@ export function SessionControls({
         </motion.div>
       )}
 
+      {/* Slide-out Panels (Chat and Moderation) */}
       <AnimatePresence>
         {currentActivePanel === "chat" && (
           <motion.div 
@@ -211,7 +229,6 @@ export function SessionControls({
               </Button>
             </div>
 
-            
             <div className="flex-1 overflow-y-auto p-4 space-y-4">
               {session.chatMessages?.length === 0 ? (
                 <div className="text-center text-muted-foreground mt-10">
@@ -272,7 +289,6 @@ export function SessionControls({
               </Button>
             </div>
 
-            
             <div className="flex-1 overflow-y-auto p-4 space-y-6">
               <div className="space-y-4">
                 <div className="flex items-center justify-between">
@@ -329,29 +345,37 @@ export function SessionControls({
                         </div>
                       </div>
                       
-                      <div className="flex items-center justify-between border-t border-white/5 pt-2">
-                        <p className="text-xs text-muted-foreground flex items-center gap-1">
-                          {p.micOn ? <Mic className={`w-3 h-3 ${peers[p.id]?.speaking ? "text-primary animate-pulse" : "text-green-400"}`} /> : <MicOff className="w-3 h-3" />}
-                          {p.micOn ? "Mic On" : "Mic Off"}
-                        </p>
-                        <div className="flex items-center gap-1">
+                      <div className="flex items-center justify-between pt-2 border-t border-white/5">
+                        <div className="flex gap-1">
                           <Button 
                             variant="ghost" 
-                            size="icon" 
+                            size="sm" 
                             onClick={() => toggleMute(p.name, p.mutedByHost)}
-                            className={`w-8 h-8 ${p.mutedByHost ? "text-red-400" : "text-muted-foreground"}`}
+                            className={`h-7 px-2 text-xs border ${p.mutedByHost ? 'bg-red-500/20 text-red-400 border-red-500/30' : 'text-muted-foreground hover:text-white border-white/10'}`}
                           >
-                            {p.mutedByHost ? <MicOff className="w-4 h-4" /> : <Mic className="w-4 h-4" />}
+                            {p.mutedByHost ? <MicOff className="w-3.5 h-3.5 mr-1" /> : <Mic className="w-3.5 h-3.5 mr-1" />}
+                            {p.mutedByHost ? "Unmute" : "Mute"}
                           </Button>
+                          
                           <Button 
                             variant="ghost" 
-                            size="icon" 
+                            size="sm" 
                             onClick={() => kickUser(p.userId, p.name)}
-                            className="w-8 h-8 text-red-400"
+                            className="h-7 px-2 text-xs text-red-400 hover:text-red-300 hover:bg-red-500/10 border border-white/10"
+                            title="Ban user"
                           >
-                            <UserMinus className="w-4 h-4" />
+                            <UserMinus className="w-3.5 h-3.5 mr-1" /> Ban
                           </Button>
                         </div>
+
+                        <Button 
+                          variant="ghost" 
+                          size="sm" 
+                          onClick={() => promoteToHost(p.userId, p.name)}
+                          className="h-7 px-2 text-[10px] text-muted-foreground hover:text-white hover:bg-white/10 border border-white/10"
+                        >
+                          Make Host
+                        </Button>
                       </div>
                     </div>
                   );
@@ -360,15 +384,17 @@ export function SessionControls({
 
               {session.bannedParticipants?.length > 0 && (
                 <div className="space-y-4 pt-4 border-t border-white/10">
-                  <p className="text-xs font-bold text-red-400 uppercase tracking-widest">Banned Users ({session.bannedParticipants.length})</p>
+                  <p className="text-xs font-bold text-muted-foreground uppercase tracking-widest text-red-400">
+                    Banned Users ({session.bannedParticipants.length})
+                  </p>
                   {session.bannedParticipants.map((bannedId: string) => (
-                    <div key={bannedId} className="flex items-center justify-between bg-red-500/5 border border-red-500/20 p-3 rounded-lg">
-                      <span className="text-xs text-white/70 font-mono">{bannedId.substring(0, 8)}...</span>
+                    <div key={bannedId} className="flex items-center justify-between bg-red-500/5 border border-red-500/10 p-2.5 rounded-lg">
+                      <span className="text-xs font-mono text-muted-foreground truncate max-w-[120px]">{bannedId}</span>
                       <Button 
                         variant="ghost" 
                         size="sm" 
                         onClick={() => unbanUser(bannedId)}
-                        className="h-7 text-[9px] font-black uppercase tracking-widest text-emerald-400 border border-emerald-400/20 hover:bg-emerald-400/10"
+                        className="h-6 text-[10px] font-bold text-red-400 hover:bg-red-500/10"
                       >
                         Unban
                       </Button>
@@ -384,48 +410,10 @@ export function SessionControls({
           </motion.div>
         )}
       </AnimatePresence>
-      {/* Hidden Remote Audio Elements */}
-      <div className="hidden">
-        {Object.entries(peers).map(([id, { stream }]) => (
-          <audio 
-            key={id} 
-            autoPlay
-            playsInline
-            ref={el => { 
-              if (el) { 
-                el.srcObject = stream; 
-                el.volume = 1.0;
-                // Only trigger overlay if playback fails AND we haven't unlocked yet
-                el.play().catch(() => {
-                  // Only show if we haven't unlocked and it's not already showing
-                  if (audioUnlocked === true) return; 
-                  setAudioUnlocked(false);
-                });
-              } 
-            }} 
-          />
-        ))}
-      </div>
 
-      {/* Mobile Audio Unlock Overlay */}
-      {!audioUnlocked && Object.keys(peers).length > 0 && (
-        <div 
-          className="fixed inset-0 z-[200] bg-black/70 backdrop-blur-sm flex items-center justify-center"
-          onClick={(e) => {
-            e.stopPropagation();
-            setAudioUnlocked(true);
-            // Force play all audio elements on the page after user gesture
-            const audios = document.querySelectorAll('audio');
-            audios.forEach(a => {
-              a.play().catch(err => console.log("Post-unlock play failed:", err));
-            });
-          }}
-        >
-          <div className="bg-[#0A0D14] border border-white/20 rounded-2xl p-8 text-center max-w-sm mx-4">
-            <Volume2 className="w-12 h-12 text-primary mx-auto mb-4 animate-pulse" />
-            <h3 className="text-xl font-bold text-white mb-2">Tap to Enable Audio</h3>
-            <p className="text-white/50 text-sm">Your browser requires a tap to play voice audio from other participants</p>
-          </div>
+      {hostMutedNotice && (
+        <div className="fixed bottom-20 left-1/2 -translate-x-1/2 z-[110] bg-red-500/90 text-white text-xs px-4 py-2 rounded-full shadow-lg font-bold backdrop-blur-sm animate-fade-in pointer-events-none">
+          You have been muted by the host.
         </div>
       )}
     </>

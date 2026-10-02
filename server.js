@@ -259,6 +259,51 @@ app.prepare().then(() => {
     return session.activityData.board
   }
 
+  function ensureDocumentState(session) {
+    if (!session.activityData) session.activityData = {}
+    if (!session.activityData.document) {
+      const page1Id = 'page_' + Date.now() + '_1'
+      session.activityData.document = {
+        id: 'doc_' + Date.now(),
+        title: 'Group Study Notes',
+        createdAt: Date.now(),
+        updatedAt: Date.now(),
+        settings: {
+          format: 'a4',
+          orientation: 'portrait',
+          margins: 'normal',
+          showPageNumbers: true,
+          headerText: 'Group Study Notes',
+        },
+        pages: [
+          {
+            id: page1Id,
+            pageNumber: 1,
+            blocks: [
+              {
+                id: 'b_' + Date.now() + '_title',
+                type: 'heading',
+                layoutType: 'flow',
+                headingLevel: 1,
+                content: 'Group Study Notes',
+                style: { align: 'left', bold: true },
+              },
+              {
+                id: 'b_' + Date.now() + '_intro',
+                type: 'text',
+                layoutType: 'flow',
+                content: 'Welcome to Group Document Studio. Everyone in this session can simultaneously edit, add tables, diagrams, checklists, shapes, and export to a clean multi-page PDF.',
+                style: { color: '#475569', fontSize: 15 },
+              }
+            ],
+          }
+        ],
+      }
+    }
+    return session.activityData.document
+  }
+
+
   function isSpectator(session, userName) {
     return Array.isArray(session.spectators) && session.spectators.includes(userName)
   }
@@ -436,6 +481,9 @@ app.prepare().then(() => {
       session.mode = mode
       session.status = status || 'live'
       session.activityData = activityData || {}
+      if (mode === 'study') {
+        ensureDocumentState(session)
+      }
       console.log(`  ▶ ${sessionId} → ${mode} (${session.status})`)
       broadcastState(sessionId)
     })
@@ -742,6 +790,150 @@ app.prepare().then(() => {
       if (!session || session.mode !== 'study') return
       session.activityData.notes = notes
       broadcastState(sessionId)
+    })
+
+    // === GROUP DOCUMENT STUDIO ATOMIC EVENTS ===
+    socket.on('study:get_doc', ({ sessionId }) => {
+      const session = sessions.get(sessionId)
+      if (!session) return
+      const doc = ensureDocumentState(session)
+      socket.emit('study:doc_state', { document: doc })
+    })
+
+    socket.on('study:title_update', ({ sessionId, title, updatedBy }) => {
+      const session = sessions.get(sessionId)
+      if (!session || session.mode !== 'study') return
+      const doc = ensureDocumentState(session)
+      doc.title = title
+      doc.updatedAt = Date.now()
+      socket.to(sessionId).emit('study:title_updated', { title, updatedBy })
+      broadcastState(sessionId)
+    })
+
+    socket.on('study:settings_update', ({ sessionId, settings, updatedBy }) => {
+      const session = sessions.get(sessionId)
+      if (!session || session.mode !== 'study') return
+      const doc = ensureDocumentState(session)
+      doc.settings = { ...doc.settings, ...settings }
+      doc.updatedAt = Date.now()
+      socket.to(sessionId).emit('study:settings_updated', { settings: doc.settings, updatedBy })
+      broadcastState(sessionId)
+    })
+
+    socket.on('study:page_create', ({ sessionId, page, updatedBy }) => {
+      const session = sessions.get(sessionId)
+      if (!session || session.mode !== 'study') return
+      const doc = ensureDocumentState(session)
+      const newPageNumber = doc.pages.length + 1
+      const newPage = {
+        id: page?.id || ('page_' + Date.now() + '_' + newPageNumber),
+        pageNumber: newPageNumber,
+        blocks: page?.blocks || [
+          {
+            id: 'b_' + Date.now() + '_text',
+            type: 'text',
+            layoutType: 'flow',
+            content: 'Start writing on page ' + newPageNumber + '...',
+          }
+        ],
+      }
+      doc.pages.push(newPage)
+      doc.updatedAt = Date.now()
+      socket.to(sessionId).emit('study:page_created', { page: newPage, updatedBy })
+      broadcastState(sessionId)
+    })
+
+    socket.on('study:page_delete', ({ sessionId, pageId, updatedBy }) => {
+      const session = sessions.get(sessionId)
+      if (!session || session.mode !== 'study') return
+      const doc = ensureDocumentState(session)
+      if (doc.pages.length <= 1) return // Must keep at least one page
+      doc.pages = doc.pages.filter(p => p.id !== pageId)
+      doc.pages.forEach((p, idx) => { p.pageNumber = idx + 1 })
+      doc.updatedAt = Date.now()
+      socket.to(sessionId).emit('study:page_deleted', { pageId, pages: doc.pages, updatedBy })
+      broadcastState(sessionId)
+    })
+
+    socket.on('study:page_reorder', ({ sessionId, pageIds, updatedBy }) => {
+      const session = sessions.get(sessionId)
+      if (!session || session.mode !== 'study') return
+      const doc = ensureDocumentState(session)
+      const pageMap = new Map(doc.pages.map(p => [p.id, p]))
+      const reordered = []
+      for (const id of pageIds) {
+        if (pageMap.has(id)) reordered.push(pageMap.get(id))
+      }
+      if (reordered.length === doc.pages.length) {
+        reordered.forEach((p, idx) => { p.pageNumber = idx + 1 })
+        doc.pages = reordered
+        doc.updatedAt = Date.now()
+        socket.to(sessionId).emit('study:page_reordered', { pages: doc.pages, updatedBy })
+        broadcastState(sessionId)
+      }
+    })
+
+    socket.on('study:block_create', ({ sessionId, pageId, block, index, updatedBy }) => {
+      const session = sessions.get(sessionId)
+      if (!session || session.mode !== 'study') return
+      const doc = ensureDocumentState(session)
+      const page = doc.pages.find(p => p.id === pageId)
+      if (!page) return
+      if (typeof index === 'number' && index >= 0 && index <= page.blocks.length) {
+        page.blocks.splice(index, 0, block)
+      } else {
+        page.blocks.push(block)
+      }
+      doc.updatedAt = Date.now()
+      socket.to(sessionId).emit('study:block_created', { pageId, block, index, updatedBy })
+      broadcastState(sessionId)
+    })
+
+    socket.on('study:block_update', ({ sessionId, pageId, blockId, block, updatedBy }) => {
+      const session = sessions.get(sessionId)
+      if (!session || session.mode !== 'study') return
+      const doc = ensureDocumentState(session)
+      const page = doc.pages.find(p => p.id === pageId)
+      if (!page) return
+      const bIdx = page.blocks.findIndex(b => b.id === blockId)
+      if (bIdx !== -1) {
+        page.blocks[bIdx] = { ...page.blocks[bIdx], ...block, updatedAt: Date.now(), updatedBy }
+        doc.updatedAt = Date.now()
+        socket.to(sessionId).emit('study:block_updated', { pageId, blockId, block: page.blocks[bIdx], updatedBy })
+      }
+    })
+
+    socket.on('study:block_move', ({ sessionId, pageId, blockId, x, y, updatedBy }) => {
+      const session = sessions.get(sessionId)
+      if (!session || session.mode !== 'study') return
+      const doc = ensureDocumentState(session)
+      const page = doc.pages.find(p => p.id === pageId)
+      if (!page) return
+      const b = page.blocks.find(b => b.id === blockId)
+      if (b) {
+        b.x = x
+        b.y = y
+        b.updatedAt = Date.now()
+        b.updatedBy = updatedBy
+        socket.to(sessionId).emit('study:block_moved', { pageId, blockId, x, y, updatedBy })
+      }
+    })
+
+    socket.on('study:block_delete', ({ sessionId, pageId, blockId, updatedBy }) => {
+      const session = sessions.get(sessionId)
+      if (!session || session.mode !== 'study') return
+      const doc = ensureDocumentState(session)
+      const page = doc.pages.find(p => p.id === pageId)
+      if (!page) return
+      page.blocks = page.blocks.filter(b => b.id !== blockId)
+      doc.updatedAt = Date.now()
+      socket.to(sessionId).emit('study:block_deleted', { pageId, blockId, updatedBy })
+      broadcastState(sessionId)
+    })
+
+    socket.on('study:presence', ({ sessionId, presence }) => {
+      // Lightweight presence relay: { userId, userName, userColor, activePageId, activePageNumber, activeBlockId }
+      socket.to(sessionId).emit('study:presence_update', presence)
     })
 
     socket.on('uno:start', ({ sessionId, cardsPerPlayer }) => {
@@ -1078,14 +1270,16 @@ app.prepare().then(() => {
     socket.on('chat:message', ({ sessionId, userName, text }) => {
       const session = sessions.get(sessionId)
       if (!session) return
-      session.chatMessages.push({
+      const newMsg = {
         id: Math.random().toString(36).substr(2, 9),
         sender: userName,
         text,
         timestamp: Date.now(),
         pinned: false
-      })
+      }
+      session.chatMessages.push(newMsg)
       if (session.chatMessages.length > 100) session.chatMessages.shift()
+      io.to(sessionId).emit('chat:message', newMsg)
       broadcastState(sessionId)
     })
 
@@ -1247,12 +1441,41 @@ app.prepare().then(() => {
     })
 
     socket.on('voice:join', ({ sessionId, userName }) => {
-      console.log(`🎙️ ${userName} joining voice in ${sessionId}`)
+      const session = sessions.get(sessionId)
+      if (!session) return
+
+      if (!session.voicePeers) {
+        session.voicePeers = new Map()
+      }
+
+      // Collect existing voice peers (excluding self)
+      const existingPeers = []
+      for (const [peerId, peer] of session.voicePeers.entries()) {
+        if (peerId !== socket.id) {
+          existingPeers.push({ peerId, name: peer.name })
+        }
+      }
+
+      session.voicePeers.set(socket.id, { peerId: socket.id, name: userName })
+      console.log(`🎙️ ${userName} (${socket.id}) joined voice in ${sessionId}. Existing peers: ${existingPeers.length}`)
+
+      // Send existing peers list to the newly joined peer
+      socket.emit('voice:peers', existingPeers)
+
+      // Notify other peers in room about new peer
       socket.to(sessionId).emit('voice:join', { targetId: socket.id, targetName: userName })
     })
 
     socket.on('voice:signal', ({ sessionId, targetId, signal, callerId, callerName }) => {
-      io.to(targetId).emit('voice:signal', { signal, callerId, callerName })
+      io.to(targetId).emit('voice:signal', { signal, callerId: callerId || socket.id, callerName })
+    })
+
+    socket.on('voice:leave', ({ sessionId }) => {
+      const session = sessions.get(sessionId)
+      if (session && session.voicePeers) {
+        session.voicePeers.delete(socket.id)
+      }
+      socket.to(sessionId).emit('voice:leave', socket.id)
     })
 
     // === THOUGHT MAP ATOMIC EVENTS ===
@@ -1460,6 +1683,9 @@ app.prepare().then(() => {
       if (!session) return
 
       // Notify others about voice leave
+      if (session.voicePeers) {
+        session.voicePeers.delete(socket.id)
+      }
       socket.to(sessionId).emit('voice:leave', socket.id)
 
       const p = session.participants.find(p => p.userId === userId && p.id === socket.id)

@@ -28,13 +28,15 @@ export function DecisionEngineHost({ session, updateActivity }: { session: any; 
   };
 
   const [question, setQuestion] = useState(state.question);
+  const [taskNotice, setTaskNotice] = useState<string | null>(null);
 
   const nextStage = (newStage: DecisionState['stage']) => {
     updateActivity({ ...state, stage: newStage }, "live");
   };
 
   const convertToTask = (optionText: string) => {
-    alert(`Task Created: "${optionText}"\nThis will appear in the Study Task Tracker!`);
+    setTaskNotice(`Task Created: "${optionText}" — sent to Task Tracker.`);
+    setTimeout(() => setTaskNotice(null), 3500);
   };
 
   if (isEditing) {
@@ -148,6 +150,12 @@ export function DecisionEngineHost({ session, updateActivity }: { session: any; 
               </div>
             ))}
           </div>
+        </div>
+      )}
+
+      {taskNotice && (
+        <div className="mt-4 p-3 bg-emerald-500/10 border border-emerald-500/30 text-emerald-300 rounded-xl text-xs font-bold text-center animate-fade-in">
+          {taskNotice}
         </div>
       )}
 

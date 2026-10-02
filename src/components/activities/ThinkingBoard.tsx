@@ -819,16 +819,53 @@ export function ThinkingBoard({
       setTextDraft("");
       setEditingTextId(null);
     } else if (tool === "move" && myPerms.move) {
+      const hitRadius = 25 / scale;
       for (let i = localElements.length - 1; i >= 0; i--) {
         const el = localElements[i];
+        let hit = false;
         if (el.kind === "text" && el.x !== undefined && el.y !== undefined) {
-          if (Math.hypot(p.x - el.x, p.y - el.y) < 40 / scale) {
-            setMovingElementId(el.id);
-            startPointRef.current = p;
-            setIsDrawing(true);
-            pushHistory(localElements);
-            break;
+          if (Math.hypot(p.x - el.x, p.y - el.y) < 40 / scale) hit = true;
+        } else if (
+          (el.kind === "rect" || el.kind === "triangle") &&
+          el.x !== undefined && el.y !== undefined && el.w !== undefined && el.h !== undefined
+        ) {
+          const minX = Math.min(el.x, el.x + el.w);
+          const maxX = Math.max(el.x, el.x + el.w);
+          const minY = Math.min(el.y, el.y + el.h);
+          const maxY = Math.max(el.y, el.y + el.h);
+          if (p.x >= minX - 10 && p.x <= maxX + 10 && p.y >= minY - 10 && p.y <= maxY + 10) {
+            hit = true;
           }
+        } else if (
+          el.kind === "circle" &&
+          el.x !== undefined && el.y !== undefined && el.w !== undefined && el.h !== undefined
+        ) {
+          const cx = el.x + el.w / 2;
+          const cy = el.y + el.h / 2;
+          const radius = Math.max(Math.abs(el.w), Math.abs(el.h)) / 2 + 10;
+          if (Math.hypot(p.x - cx, p.y - cy) <= radius) hit = true;
+        } else if (
+          el.kind === "line" &&
+          el.x !== undefined && el.y !== undefined && el.w !== undefined && el.h !== undefined
+        ) {
+          if (distToSegment(p, { x: el.x, y: el.y }, { x: el.x + el.w, y: el.y + el.h }) < hitRadius) {
+            hit = true;
+          }
+        } else if (el.kind === "stroke" && el.points) {
+          for (let j = 0; j < el.points.length - 1; j++) {
+            if (distToSegment(p, el.points[j], el.points[j + 1]) < hitRadius) {
+              hit = true;
+              break;
+            }
+          }
+        }
+
+        if (hit) {
+          setMovingElementId(el.id);
+          startPointRef.current = p;
+          setIsDrawing(true);
+          pushHistory(localElements);
+          break;
         }
       }
     } else if ((tool === "rect" || tool === "circle" || tool === "line" || tool === "triangle") && myPerms.draw) {
@@ -882,13 +919,21 @@ export function ThinkingBoard({
     const p = toCanvasPoint(e.clientX, e.clientY);
 
     if (tool === "move" && movingElementId) {
+      const dx = p.x - startPointRef.current!.x;
+      const dy = p.y - startPointRef.current!.y;
       setLocalElements((prev) =>
         prev.map((el) => {
           if (el.id === movingElementId) {
+            if (el.points && el.points.length > 0) {
+              return {
+                ...el,
+                points: el.points.map((pt) => ({ x: pt.x + dx, y: pt.y + dy })),
+              };
+            }
             return {
               ...el,
-              x: (el.x || 0) + (p.x - startPointRef.current!.x),
-              y: (el.y || 0) + (p.y - startPointRef.current!.y),
+              x: (el.x || 0) + dx,
+              y: (el.y || 0) + dy,
             };
           }
           return el;

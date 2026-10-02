@@ -163,7 +163,8 @@ export function WordChainHost({ session, socket, userName }: { session: any; soc
     
     const trimmed = word.trim().toLowerCase();
     if (lastLetter && trimmed[0] !== lastLetter) {
-      alert(`Word must start with '${lastLetter.toUpperCase()}'!`);
+      setSubmitError(`Word must start with '${lastLetter.toUpperCase()}'!`);
+      setTimeout(() => setSubmitError(null), 3000);
       return;
     }
 
@@ -179,7 +180,8 @@ export function WordChainHost({ session, socket, userName }: { session: any; soc
     setIsValidating(false);
 
     if (!isValid) {
-      alert(`"${trimmed}" is not a valid English word!`);
+      setSubmitError(`"${trimmed}" is not a valid English word!`);
+      setTimeout(() => setSubmitError(null), 3000);
       return;
     }
 
@@ -317,7 +319,8 @@ export function WordChainParticipant({ session, socket, userName }: { session: a
     
     const trimmed = word.trim().toLowerCase();
     if (lastLetter && trimmed[0] !== lastLetter) {
-      alert(`Word must start with '${lastLetter.toUpperCase()}'!`);
+      setSubmitError(`Word must start with '${lastLetter.toUpperCase()}'!`);
+      setTimeout(() => setSubmitError(null), 3000);
       return;
     }
 
@@ -333,7 +336,8 @@ export function WordChainParticipant({ session, socket, userName }: { session: a
     setIsValidating(false);
 
     if (!isValid) {
-      alert(`"${trimmed}" is not a valid English word!`);
+      setSubmitError(`"${trimmed}" is not a valid English word!`);
+      setTimeout(() => setSubmitError(null), 3000);
       return;
     }
 

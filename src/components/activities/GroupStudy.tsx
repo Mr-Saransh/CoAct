@@ -1,81 +1,171 @@
-import React, { useState, useEffect } from "react";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
-import { GraduationCap, Users, BookOpen, MessageCircle } from "lucide-react";
-import { motion } from "framer-motion";
+import React, { useState } from "react";
+import { GroupDocumentStudio } from "./document/GroupDocumentStudio";
+import { FocusTimerHost, FocusTimerParticipant } from "./FocusTimer";
+import { TaskTrackerHost, TaskTrackerParticipant } from "./TaskTracker";
+import { FileText, Timer, ListTodo } from "lucide-react";
 
-export function GroupStudyHost({ session, updateActivity }: { session: any; updateActivity: any }) {
-  const activityData = session.activityData || {};
-  const { notes = "" } = activityData;
+interface GroupStudyHostProps {
+  session: any;
+  socket?: any;
+  userName?: string;
+  updateActivity?: any;
+}
 
-  const updateNotes = (notes: string) => {
-    updateActivity({ ...activityData, notes });
-  };
+export function GroupStudyHost({ 
+  session, 
+  socket, 
+  userName = "Host", 
+  updateActivity 
+}: GroupStudyHostProps) {
+  const [activeTab, setActiveTab] = useState<"document" | "focus_tasks">("document");
 
   return (
-    <div className="p-8 h-full flex flex-col max-w-4xl mx-auto w-full">
-      <div className="flex items-center justify-between mb-8">
-        <div>
-          <h2 className="text-3xl font-outfit font-bold flex items-center gap-2">
-            <GraduationCap className="text-primary w-8 h-8" /> Group Study Session
-          </h2>
-          <p className="text-muted-foreground">Collaborate on notes and discuss in real-time.</p>
-        </div>
-        <div className="flex items-center gap-2 bg-white/5 border border-white/10 px-4 py-2 rounded-xl">
-          <Users className="w-4 h-4 text-primary" />
-          <span className="text-sm font-medium">{session.participants.length} online</span>
-        </div>
+    <div className="w-full h-full flex flex-col bg-[#0b0f19] text-white overflow-hidden relative">
+      {/* Floating Sub-Tab Toggle in top-right corner to access study companion tools */}
+      <div className="absolute top-2.5 right-36 z-50 flex items-center bg-slate-900/90 border border-slate-700/80 rounded-lg p-0.5 shadow-xl backdrop-blur-md">
+        <button
+          onClick={() => setActiveTab("document")}
+          className={`px-2.5 py-1 rounded-md text-xs font-semibold flex items-center gap-1.5 transition-all ${
+            activeTab === "document"
+              ? "bg-blue-600 text-white shadow-sm"
+              : "text-slate-400 hover:text-white"
+          }`}
+          title="Document Studio"
+        >
+          <FileText className="w-3.5 h-3.5" />
+          <span className="hidden sm:inline">Document</span>
+        </button>
+        <button
+          onClick={() => setActiveTab("focus_tasks")}
+          className={`px-2.5 py-1 rounded-md text-xs font-semibold flex items-center gap-1.5 transition-all ${
+            activeTab === "focus_tasks"
+              ? "bg-blue-600 text-white shadow-sm"
+              : "text-slate-400 hover:text-white"
+          }`}
+          title="Session Focus & Tasks"
+        >
+          <Timer className="w-3.5 h-3.5" />
+          <span className="hidden sm:inline">Focus & Tasks</span>
+        </button>
       </div>
 
-      <Card className="flex-1 border-white/10 bg-white/5 backdrop-blur-xl flex flex-col overflow-hidden">
-        <div className="px-4 py-3 border-b border-white/10 bg-white/5 flex items-center gap-2">
-          <BookOpen className="w-4 h-4 text-primary" />
-          <span className="text-sm font-bold uppercase tracking-wider">Shared Study Notes</span>
+      {/* Main Studio vs Study Companion View */}
+      {activeTab === "document" ? (
+        <GroupDocumentStudio
+          session={session}
+          socket={socket}
+          userName={userName}
+          isHost={true}
+        />
+      ) : (
+        <div className="flex-1 w-full overflow-y-auto custom-scrollbar p-6 max-w-5xl mx-auto space-y-6">
+          <div className="flex items-center justify-between pb-4 border-b border-slate-800">
+            <div>
+              <h2 className="text-2xl font-bold text-white flex items-center gap-2">
+                <Timer className="w-6 h-6 text-blue-400" /> Focus Timer & Tasks
+              </h2>
+              <p className="text-xs text-slate-400">Keep session momentum and track learning milestones.</p>
+            </div>
+            <button
+              onClick={() => setActiveTab("document")}
+              className="text-xs text-blue-400 hover:underline flex items-center gap-1"
+            >
+              ← Back to Shared Document
+            </button>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div className="bg-slate-900/60 border border-slate-800 rounded-2xl p-4 shadow-xl">
+              <FocusTimerHost session={session} updateActivity={updateActivity} />
+            </div>
+            <div className="bg-slate-900/60 border border-slate-800 rounded-2xl p-4 shadow-xl">
+              <TaskTrackerHost session={session} updateActivity={updateActivity} />
+            </div>
+          </div>
         </div>
-        <CardContent className="p-0 flex-1 flex flex-col">
-          <textarea 
-            value={notes}
-            onChange={(e) => updateNotes(e.target.value)}
-            placeholder="Type shared notes here..."
-            className="flex-1 resize-none border-none bg-transparent p-6 text-lg focus-visible:ring-0 outline-none text-white"
-          />
-        </CardContent>
-      </Card>
+      )}
     </div>
   );
 }
 
-export function GroupStudyParticipant({ session, socket, userName }: { session: any; socket: any; userName: string }) {
-  const activityData = session.activityData || {};
-  const { notes = "" } = activityData;
+interface GroupStudyParticipantProps {
+  session: any;
+  socket: any;
+  userName: string;
+}
 
-  const handleNotesChange = (notes: string) => {
-    socket.emit("study:notes", { sessionId: session.id, notes });
-  };
+export function GroupStudyParticipant({ 
+  session, 
+  socket, 
+  userName 
+}: GroupStudyParticipantProps) {
+  const [activeTab, setActiveTab] = useState<"document" | "focus_tasks">("document");
 
   return (
-    <div className="w-full max-w-4xl mx-auto flex flex-col h-full">
-      <div className="text-center mb-8">
-        <h2 className="text-2xl font-outfit font-bold flex items-center justify-center gap-2">
-          <GraduationCap className="text-primary w-6 h-6" /> Group Study
-        </h2>
-        <p className="text-sm text-muted-foreground mt-1">Study together with voice and chat.</p>
+    <div className="w-full h-full flex flex-col bg-[#0b0f19] text-white overflow-hidden relative">
+      {/* Floating Sub-Tab Toggle in top-right corner to access study companion tools */}
+      <div className="absolute top-2.5 right-36 z-50 flex items-center bg-slate-900/90 border border-slate-700/80 rounded-lg p-0.5 shadow-xl backdrop-blur-md">
+        <button
+          onClick={() => setActiveTab("document")}
+          className={`px-2.5 py-1 rounded-md text-xs font-semibold flex items-center gap-1.5 transition-all ${
+            activeTab === "document"
+              ? "bg-blue-600 text-white shadow-sm"
+              : "text-slate-400 hover:text-white"
+          }`}
+          title="Document Studio"
+        >
+          <FileText className="w-3.5 h-3.5" />
+          <span className="hidden sm:inline">Document</span>
+        </button>
+        <button
+          onClick={() => setActiveTab("focus_tasks")}
+          className={`px-2.5 py-1 rounded-md text-xs font-semibold flex items-center gap-1.5 transition-all ${
+            activeTab === "focus_tasks"
+              ? "bg-blue-600 text-white shadow-sm"
+              : "text-slate-400 hover:text-white"
+          }`}
+          title="Session Focus & Tasks"
+        >
+          <Timer className="w-3.5 h-3.5" />
+          <span className="hidden sm:inline">Focus & Tasks</span>
+        </button>
       </div>
 
-      <Card className="flex-1 border-white/10 bg-white/5 backdrop-blur-xl flex flex-col overflow-hidden mb-20 shadow-2xl">
-        <div className="px-4 py-3 border-b border-white/10 bg-white/5 flex items-center gap-2">
-          <BookOpen className="w-4 h-4 text-primary" />
-          <span className="text-xs font-bold uppercase tracking-wider">Shared Notes (Editable by anyone)</span>
+      {/* Main Studio vs Study Companion View */}
+      {activeTab === "document" ? (
+        <GroupDocumentStudio
+          session={session}
+          socket={socket}
+          userName={userName}
+          isHost={false}
+        />
+      ) : (
+        <div className="flex-1 w-full overflow-y-auto custom-scrollbar p-6 max-w-5xl mx-auto space-y-6">
+          <div className="flex items-center justify-between pb-4 border-b border-slate-800">
+            <div>
+              <h2 className="text-2xl font-bold text-white flex items-center gap-2">
+                <Timer className="w-6 h-6 text-blue-400" /> Focus Timer & Tasks
+              </h2>
+              <p className="text-xs text-slate-400">Keep session momentum and track learning milestones.</p>
+            </div>
+            <button
+              onClick={() => setActiveTab("document")}
+              className="text-xs text-blue-400 hover:underline flex items-center gap-1"
+            >
+              ← Back to Shared Document
+            </button>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div className="bg-slate-900/60 border border-slate-800 rounded-2xl p-4 shadow-xl">
+              <FocusTimerParticipant session={session} />
+            </div>
+            <div className="bg-slate-900/60 border border-slate-800 rounded-2xl p-4 shadow-xl">
+              <TaskTrackerParticipant session={session} socket={socket} userName={userName} />
+            </div>
+          </div>
         </div>
-        <CardContent className="p-0 flex-1 flex flex-col">
-          <textarea 
-            value={notes}
-            onChange={(e) => handleNotesChange(e.target.value)}
-            placeholder="No notes yet. Start typing..."
-            className="flex-1 resize-none border-none bg-transparent p-6 text-base focus-visible:ring-0 leading-relaxed outline-none text-white"
-          />
-        </CardContent>
-      </Card>
+      )}
     </div>
   );
 }

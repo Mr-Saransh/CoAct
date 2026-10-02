@@ -1,6 +1,6 @@
 "use client";
 
-import { Suspense, useState, useEffect, useCallback } from "react";
+import { Suspense, useState, useEffect, useCallback, useRef } from "react";
 import Image from "next/image";
 import { useParams, useSearchParams } from "next/navigation";
 import dynamic from "next/dynamic";
@@ -133,17 +133,55 @@ function HostSessionContent() {
   const [showParticipants, setShowParticipants] = useState(false);
   const [activeCategory, setActiveCategory] = useState<keyof typeof ACTIVITIES>("classroom");
   const [showSidebar, setShowSidebar] = useState(false);
-  const [isMuted, setIsMuted] = useState(false);
+  const [isMuted, setIsMuted] = useState(true);
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [activePanel, setActivePanel] = useState<"chat" | "mod" | null>(null);
+  const [copiedLink, setCopiedLink] = useState(false);
+
+  const [hasUnreadChat, setHasUnreadChat] = useState(false);
+  const [voiceState, setVoiceState] = useState<"connected" | "connecting" | "reconnecting" | "disconnected">("connected");
+  const lastSeenMsgCountRef = useRef(0);
+
+  const handleVoiceStateChange = useCallback((state: "connected" | "connecting" | "reconnecting" | "disconnected") => {
+    setVoiceState(state);
+  }, []);
+
+  // Track chat messages and update unread dot on Menu button
+  useEffect(() => {
+    if (!session) return;
+    const msgs = session.chatMessages || [];
+    if (activePanel === "chat") {
+      lastSeenMsgCountRef.current = msgs.length;
+      setHasUnreadChat(false);
+    } else {
+      if (msgs.length > lastSeenMsgCountRef.current) {
+        const lastMsg = msgs[msgs.length - 1];
+        if (lastMsg && lastMsg.sender !== hostName) {
+          setHasUnreadChat(true);
+        }
+      }
+    }
+  }, [session?.chatMessages, activePanel, hostName]);
+
+  // Instant realtime event for incoming chat message
+  useEffect(() => {
+    if (!socket) return;
+    const onDirectChatMsg = (newMsg: any) => {
+      if (activePanel !== "chat" && newMsg.sender !== hostName) {
+        setHasUnreadChat(true);
+      }
+    };
+    socket.on("chat:message", onDirectChatMsg);
+    return () => {
+      socket.off("chat:message", onDirectChatMsg);
+    };
+  }, [socket, activePanel, hostName]);
 
   const handleToggleMic = useCallback(() => {
     const newState = !isMuted;
     setIsMuted(newState);
     socket?.emit("voice:toggle", { sessionId, userName: hostName, micOn: !newState });
   }, [isMuted, socket, sessionId, hostName]);
-
-
 
   const setCategory = (cat: keyof typeof ACTIVITIES) => {
     setActiveCategory(cat);
@@ -173,14 +211,21 @@ function HostSessionContent() {
   useEffect(() => {
     if (!session || !userId) return;
     const me = session.participants.find(p => p.userId === userId);
-    if (me && me.micOn === isMuted) {
+    if (me && me.micOn !== undefined) {
       setIsMuted(!me.micOn);
     }
   }, [session?.participants, userId]);
 
   const handleExitActivity = useCallback(() => endActivity(), [endActivity]);
+  const handleNavigateSection = useCallback((cat: 'classroom' | 'study' | 'decide' | 'play') => {
+    endActivity();
+    setActiveCategory(cat);
+  }, [endActivity]);
   const handleEndSession = useCallback(() => { socket?.emit("session:end", { sessionId }); window.location.href = "/"; }, [socket, sessionId]);
-  const handleOpenChat = useCallback(() => setActivePanel(prev => prev === "chat" ? null : "chat"), []);
+  const handleOpenChat = useCallback(() => {
+    setActivePanel(prev => prev === "chat" ? null : "chat");
+    setHasUnreadChat(false);
+  }, []);
   const handleOpenModeration = useCallback(() => setActivePanel(prev => prev === "mod" ? null : "mod"), []);
 
   const handleTogglePin = useCallback(() => {
@@ -371,11 +416,16 @@ function HostSessionContent() {
                   <button 
                     onClick={() => {
                       navigator.clipboard.writeText(`${window.location.origin}/session/${sessionId}`);
-                      alert("Link copied!");
+                      setCopiedLink(true);
+                      setTimeout(() => setCopiedLink(false), 2500);
                     }}
-                    className="w-full py-2.5 rounded-lg bg-white/5 border border-white/10 text-[10px] font-black uppercase tracking-widest text-white hover:bg-primary hover:text-black hover:border-primary transition-all"
+                    className={`w-full py-2.5 rounded-lg border text-[10px] font-black uppercase tracking-widest transition-all ${
+                      copiedLink 
+                        ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40 shadow-[0_0_15px_rgba(16,185,129,0.2)]'
+                        : 'bg-white/5 border-white/10 text-white hover:bg-primary hover:text-black hover:border-primary'
+                    }`}
                   >
-                    Copy Invite Link
+                    {copiedLink ? "✓ Copied to Clipboard" : "Copy Invite Link"}
                   </button>
                 </div>
 
@@ -401,7 +451,8 @@ function HostSessionContent() {
                     </button>
                     <div className="flex items-center justify-between gap-2">
                       <button 
-                        onClick={() => alert("Settings Panel Coming Soon!")}
+                        onClick={() => setInviteOpen(true)}
+                        title="Session Details & Invite QR"
                         className="flex-1 py-3 rounded-xl border border-white/10 flex items-center justify-center hover:bg-white/5 hover:border-white/20 transition-all group"
                       >
                         <Settings className="w-5 h-5 text-white/40 group-hover:text-white group-hover:rotate-45 transition-all" />
@@ -432,7 +483,7 @@ function HostSessionContent() {
         <main className={`flex-1 relative flex flex-col min-h-0 ${isLive ? "" : "overflow-y-auto"}`}>
           {isLive && socket ? (
             <div className={`w-full h-full flex-1 relative ${
-              currentMode === "board" || currentMode === "thoughtmap" || currentMode === "uno" ? "overflow-hidden" : "overflow-y-auto custom-scrollbar"
+              currentMode === "board" || currentMode === "thoughtmap" || currentMode === "uno" || currentMode === "study" ? "overflow-hidden" : "overflow-y-auto custom-scrollbar"
             }`}>
               {currentMode === "board" ? <ThinkingBoard socket={socket} sessionId={sessionId} userName={hostName} session={session} isHost={true} /> :
               currentMode === "poll" ? <LivePollHost session={session} updateActivity={updateActivity} /> :
@@ -443,7 +494,7 @@ function HostSessionContent() {
               currentMode === "fitb" ? <FITBHost session={session} updateActivity={updateActivity} /> :
               currentMode === "wordchain" ? <WordChainHost session={session} socket={socket} userName={hostName} updateActivity={updateActivity} /> :
               currentMode === "mostlikely" ? <MostLikelyHost session={session} updateActivity={updateActivity} /> :
-              currentMode === "study" ? <GroupStudyHost session={session} updateActivity={updateActivity} /> :
+              currentMode === "study" ? <GroupStudyHost session={session} socket={socket} userName={hostName} updateActivity={updateActivity} /> :
               currentMode === "uno" ? <UnoHost session={session} socket={socket} userName={hostName} /> :
               currentMode === "ludo" ? <LudoHost session={session} socket={socket} /> :
               currentMode === "thoughtmap" ? <ThoughtMapHost session={session} updateActivity={updateActivity} /> :
@@ -693,6 +744,9 @@ function HostSessionContent() {
           showBar={false}
           activePanel={activePanel}
           setActivePanel={setActivePanel}
+          isMicMuted={isMuted}
+          onToggleMic={handleToggleMic}
+          onVoiceStateChange={handleVoiceStateChange}
         />
       )}
 
@@ -700,9 +754,13 @@ function HostSessionContent() {
       <SessionFloatingController 
         isHost={true}
         onExitActivity={handleExitActivity}
+        onNavigateSection={handleNavigateSection}
+        currentSection={activeCategory}
         onEndSession={handleEndSession}
         onToggleMic={handleToggleMic}
         isMicMuted={isMuted}
+        voiceState={voiceState}
+        hasUnreadMessages={hasUnreadChat}
         onOpenChat={handleOpenChat}
         onOpenModeration={handleOpenModeration}
         onTogglePin={handleTogglePin}
