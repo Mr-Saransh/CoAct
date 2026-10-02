@@ -1218,15 +1218,38 @@ app.prepare().then(() => {
       if (!session || session.mode !== 'thoughtmap') return
       if (!session.activityData.nodes) session.activityData.nodes = []
       if (!session.activityData.connections) session.activityData.connections = []
-      session.activityData.nodes.push(node)
+      // Deduplicate: prevent inserting duplicate node if client retries
+      if (!session.activityData.nodes.some(n => n.id === node.id)) {
+        session.activityData.nodes.push(node)
+      }
+      // Broadcast lightweight instant creation to other clients immediately
+      socket.to(sessionId).emit('thoughtmap:node_added', { node, by: socket.data.name })
       broadcastState(sessionId)
     })
 
+    // Lightweight move: update server state but broadcast ONLY the position delta
     socket.on('thoughtmap:move_node', ({ sessionId, nodeId, x, y }) => {
       const session = sessions.get(sessionId)
       if (!session || session.mode !== 'thoughtmap') return
       const node = (session.activityData.nodes || []).find(n => n.id === nodeId)
-      if (node) { node.x = x; node.y = y; broadcastState(sessionId) }
+      if (node) {
+        node.x = x
+        node.y = y
+        // Broadcast lightweight position update to OTHER clients only
+        socket.to(sessionId).emit('thoughtmap:node_moved', { nodeId, x, y, by: socket.data.name })
+      }
+    })
+
+    // Final authoritative position after drag ends — full state sync
+    socket.on('thoughtmap:move_node_final', ({ sessionId, nodeId, x, y }) => {
+      const session = sessions.get(sessionId)
+      if (!session || session.mode !== 'thoughtmap') return
+      const node = (session.activityData.nodes || []).find(n => n.id === nodeId)
+      if (node) {
+        node.x = x
+        node.y = y
+        broadcastState(sessionId)
+      }
     })
 
     socket.on('thoughtmap:update_node', ({ sessionId, nodeId, text, color }) => {
@@ -1245,6 +1268,7 @@ app.prepare().then(() => {
       if (!session || session.mode !== 'thoughtmap') return
       session.activityData.nodes = (session.activityData.nodes || []).filter(n => n.id !== nodeId)
       session.activityData.connections = (session.activityData.connections || []).filter(c => c.from !== nodeId && c.to !== nodeId)
+      socket.to(sessionId).emit('thoughtmap:node_deleted', { nodeId })
       broadcastState(sessionId)
     })
 
@@ -1261,6 +1285,12 @@ app.prepare().then(() => {
       if (!session || session.mode !== 'thoughtmap') return
       session.activityData.connections = (session.activityData.connections || []).filter(c => c.id !== connectionId)
       broadcastState(sessionId)
+    })
+
+    // === PRESENCE / VIEWPORT ===
+    socket.on('presence:viewport', ({ sessionId, viewport, userName }) => {
+      // Lightweight broadcast — no state mutation, just relay to others
+      socket.to(sessionId).emit('presence:viewport', { userName, viewport })
     })
 
     // === DUEL DEBATE ATOMIC EVENTS ===
