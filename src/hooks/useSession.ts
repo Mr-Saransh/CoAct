@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useMemo } from "react";
 import { useSocket } from "@/components/providers/SocketProvider";
 import { SessionState } from "@/lib/types";
 
@@ -87,5 +87,15 @@ export function useSession(sessionId: string, name: string, role: "host" | "part
     socket.emit("session:promote", { sessionId, targetUserId });
   }, [socket, sessionId]);
 
-  return { session, error, isKicked, userId, startActivity, updateActivity, endActivity, promoteUser, isConnected };
+  return useMemo(() => ({
+    session,
+    error,
+    isKicked,
+    userId,
+    startActivity,
+    updateActivity,
+    endActivity,
+    promoteUser,
+    isConnected,
+  }), [session, error, isKicked, userId, startActivity, updateActivity, endActivity, promoteUser, isConnected]);
 }

@@ -276,6 +276,8 @@ export interface TableData {
   colWidths?: number[];
   cellBgColors?: Record<string, string>;
   cellTextColors?: Record<string, string>;
+  headerTextColor?: string;
+  textColor?: string;
 }
 
 export type DiagramNodeShape = 'rectangle' | 'rounded' | 'circle' | 'diamond' | 'pill' | 'database' | 'document' | 'io';

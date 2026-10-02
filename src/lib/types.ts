@@ -22,7 +22,7 @@ export interface SessionState {
   hostId: string; // Durable Host User ID
   hostName: string;
   hostStatus: "active" | "idle" | "offline";
-  mode: "lobby" | "poll" | "quiz" | "qa" | "fitb" | "board" | "focus" | "tasks" | "trivia" | "wordchain" | "mostlikely" | "study" | "uno" | "ludo" | "thoughtmap" | "courtroom" | "duel" | "decision" | "rmcs";
+  mode: "lobby" | "poll" | "quiz" | "qa" | "fitb" | "board" | "focus" | "tasks" | "trivia" | "wordchain" | "mostlikely" | "study" | "uno" | "ludo" | "thoughtmap" | "courtroom" | "duel" | "decision";
   status: "waiting" | "live" | "ended";
   activityData: Record<string, any>;
   participants: Participant[];

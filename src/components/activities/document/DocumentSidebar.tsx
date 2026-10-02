@@ -949,6 +949,90 @@ export const DocumentSidebar: React.FC<DocumentSidebarProps> = ({
                       </Button>
                     </div>
                   </div>
+
+                  {/* Table Text Color Styling */}
+                  <div className="p-2.5 rounded-xl bg-slate-800/50 border border-slate-800 space-y-2">
+                    <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">
+                      Text & Typography Colors
+                    </span>
+
+                    {/* Table-wide Text Color */}
+                    <div className="space-y-1">
+                      <label className="text-[10px] text-slate-400 block">Table Text Color</label>
+                      <div className="flex items-center gap-2">
+                        <div className="flex items-center gap-1.5 bg-slate-800 border border-slate-700 rounded-lg p-1 flex-1">
+                          <input
+                            type="color"
+                            value={tableData.textColor || selectedBlock.style?.color || '#0f172a'}
+                            onChange={(e) => {
+                              const val = e.target.value;
+                              onUpdateBlock(selectedBlock.id, {
+                                content: { ...tableData, textColor: val },
+                                style: { ...selectedBlock.style, color: val }
+                              });
+                            }}
+                            className="w-5 h-5 rounded cursor-pointer bg-transparent border-0"
+                          />
+                          <span className="text-[10px] font-mono text-slate-300 truncate">
+                            {tableData.textColor || selectedBlock.style?.color || '#0f172a'}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Header Specific Text Color */}
+                    <div className="space-y-1">
+                      <label className="text-[10px] text-slate-400 block">Header Text Color</label>
+                      <div className="flex items-center gap-2">
+                        <div className="flex items-center gap-1.5 bg-slate-800 border border-slate-700 rounded-lg p-1 flex-1">
+                          <input
+                            type="color"
+                            value={tableData.headerTextColor || tableData.textColor || '#0f172a'}
+                            onChange={(e) => {
+                              onUpdateBlock(selectedBlock.id, {
+                                content: { ...tableData, headerTextColor: e.target.value }
+                              });
+                            }}
+                            className="w-5 h-5 rounded cursor-pointer bg-transparent border-0"
+                          />
+                          <span className="text-[10px] font-mono text-slate-300 truncate">
+                            {tableData.headerTextColor || tableData.textColor || '#0f172a'}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Quick Color Swatches */}
+                    <div>
+                      <span className="text-[9px] text-slate-500 block mb-1">Quick Text Swatches</span>
+                      <div className="flex items-center gap-1.5 flex-wrap">
+                        {[
+                          { label: 'Dark', val: '#0f172a' },
+                          { label: 'White', val: '#ffffff' },
+                          { label: 'Slate', val: '#475569' },
+                          { label: 'Blue', val: '#2563eb' },
+                          { label: 'Emerald', val: '#059669' },
+                          { label: 'Amber', val: '#d97706' },
+                          { label: 'Red', val: '#dc2626' },
+                          { label: 'Purple', val: '#7c3aed' },
+                        ].map(c => (
+                          <button
+                            key={c.val}
+                            type="button"
+                            onClick={() => {
+                              onUpdateBlock(selectedBlock.id, {
+                                content: { ...tableData, textColor: c.val, headerTextColor: c.val },
+                                style: { ...selectedBlock.style, color: c.val }
+                              });
+                            }}
+                            className="w-5 h-5 rounded-full border border-slate-600 hover:scale-110 transition-transform shadow-xs cursor-pointer"
+                            style={{ backgroundColor: c.val }}
+                            title={`Set text to ${c.label}`}
+                          />
+                        ))}
+                      </div>
+                    </div>
+                  </div>
                 </div>
               );
             })()}
@@ -1071,6 +1155,75 @@ export const DocumentSidebar: React.FC<DocumentSidebarProps> = ({
                       >
                         <span>Tree Flow</span>
                       </button>
+                    </div>
+                  </div>
+
+                  {/* Diagram Text & Label Color Styling */}
+                  <div className="p-2.5 rounded-xl bg-slate-800/50 border border-slate-800 space-y-2">
+                    <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">
+                      Node Text & Label Colors
+                    </span>
+
+                    {/* All Nodes Text Color */}
+                    <div className="space-y-1">
+                      <label className="text-[10px] text-slate-400 block">Node Text Color (All Nodes)</label>
+                      <div className="flex items-center gap-2">
+                        <div className="flex items-center gap-1.5 bg-slate-800 border border-slate-700 rounded-lg p-1 flex-1">
+                          <input
+                            type="color"
+                            value={diagramData.nodes?.[0]?.textColor || '#ffffff'}
+                            onChange={(e) => {
+                              const val = e.target.value;
+                              const updatedNodes = (diagramData.nodes || []).map(n => ({
+                                ...n,
+                                textColor: val
+                              }));
+                              onUpdateBlock(selectedBlock.id, {
+                                content: { ...diagramData, nodes: updatedNodes },
+                                style: { ...selectedBlock.style, color: val }
+                              });
+                            }}
+                            className="w-5 h-5 rounded cursor-pointer bg-transparent border-0"
+                          />
+                          <span className="text-[10px] font-mono text-slate-300 truncate">
+                            {diagramData.nodes?.[0]?.textColor || '#ffffff'}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Quick Swatches for Diagram Text */}
+                    <div>
+                      <span className="text-[9px] text-slate-500 block mb-1">Quick Label Swatches</span>
+                      <div className="flex items-center gap-1.5 flex-wrap">
+                        {[
+                          { label: 'White', val: '#ffffff' },
+                          { label: 'Dark', val: '#0f172a' },
+                          { label: 'Amber', val: '#fef08a' },
+                          { label: 'Cyan', val: '#67e8f9' },
+                          { label: 'Emerald', val: '#6ee7b7' },
+                          { label: 'Rose', val: '#fda4af' },
+                          { label: 'Violet', val: '#c4b5fd' },
+                        ].map(c => (
+                          <button
+                            key={c.val}
+                            type="button"
+                            onClick={() => {
+                              const updatedNodes = (diagramData.nodes || []).map(n => ({
+                                ...n,
+                                textColor: c.val
+                              }));
+                              onUpdateBlock(selectedBlock.id, {
+                                content: { ...diagramData, nodes: updatedNodes },
+                                style: { ...selectedBlock.style, color: c.val }
+                              });
+                            }}
+                            className="w-5 h-5 rounded-full border border-slate-600 hover:scale-110 transition-transform shadow-xs cursor-pointer"
+                            style={{ backgroundColor: c.val }}
+                            title={`Set diagram text to ${c.label}`}
+                          />
+                        ))}
+                      </div>
                     </div>
                   </div>
                 </div>

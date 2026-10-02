@@ -704,6 +704,9 @@ const TableBlockContent: React.FC<{
     onUpdate({ content: { ...data, headers: nextHeaders, rows: nextRows } });
   };
 
+  const defaultTableTextColor = data.textColor || block.style?.color;
+  const headerTextColor = data.headerTextColor || defaultTableTextColor;
+
   return (
     <div className="w-full my-1.5 overflow-x-auto custom-scrollbar touch-pan-x select-text" style={{ WebkitOverflowScrolling: 'touch' }}>
       <div className="min-w-full inline-block align-middle">
@@ -711,13 +714,18 @@ const TableBlockContent: React.FC<{
           <thead className="bg-slate-100 dark:bg-slate-800">
             <tr>
               {data.headers.map((h, i) => (
-                <th key={i} className="border border-slate-300 dark:border-slate-700 p-2 text-left font-semibold text-slate-800 dark:text-slate-100 group/th relative">
+                <th 
+                  key={i} 
+                  className="border border-slate-300 dark:border-slate-700 p-2 text-left font-semibold text-slate-800 dark:text-slate-100 group/th relative"
+                  style={{ color: headerTextColor || undefined }}
+                >
                   <input
                     type="text"
                     disabled={!canEdit}
                     value={h}
                     onChange={(e) => handleHeaderChange(i, e.target.value)}
                     className="w-full bg-transparent border-none outline-none focus:ring-0 p-0 font-semibold"
+                    style={{ color: headerTextColor || undefined }}
                   />
                   {canEdit && data.headers.length > 1 && (
                     <button
@@ -745,7 +753,7 @@ const TableBlockContent: React.FC<{
                 {row.map((cell, cIdx) => {
                   const cellKey = `${rIdx}_${cIdx}`;
                   const cellBg = data.cellBgColors?.[cellKey];
-                  const cellColor = data.cellTextColors?.[cellKey];
+                  const cellColor = data.cellTextColors?.[cellKey] || defaultTableTextColor;
 
                   return (
                     <td 
@@ -1674,7 +1682,8 @@ const DiagramBlockContent: React.FC<{
                     disabled={!canEdit || !isEditing}
                     value={node.label}
                     onChange={(e) => handleNodeLabelChange(node.id, e.target.value)}
-                    className="relative z-10 w-full text-center bg-transparent border-none outline-none font-bold text-xs text-white placeholder-white/70"
+                    className="relative z-10 w-full text-center bg-transparent border-none outline-none font-bold text-xs placeholder-white/70"
+                    style={{ color: node.textColor || '#ffffff' }}
                   />
                 </div>
               ) : (
@@ -1683,7 +1692,8 @@ const DiagramBlockContent: React.FC<{
                   disabled={!canEdit || !isEditing}
                   value={node.label}
                   onChange={(e) => handleNodeLabelChange(node.id, e.target.value)}
-                  className="w-full text-center bg-transparent border-none outline-none font-bold text-xs text-inherit placeholder-white/70 pointer-events-auto"
+                  className="w-full text-center bg-transparent border-none outline-none font-bold text-xs placeholder-white/70 pointer-events-auto"
+                  style={{ color: node.textColor || '#ffffff' }}
                 />
               )}
 

@@ -86,8 +86,14 @@ export const SocketProvider = ({ children }: { children: React.ReactNode }) => {
     };
   }, []);
 
+  const contextValue = React.useMemo(() => ({
+    socket: socketRef.current,
+    isConnected,
+    isReconnecting,
+  }), [isConnected, isReconnecting]);
+
   return (
-    <SocketContext.Provider value={{ socket: socketRef.current, isConnected, isReconnecting }}>
+    <SocketContext.Provider value={contextValue}>
       {/* Subtle, non-blocking connection status indicators */}
       {isReconnecting && (
         <div 

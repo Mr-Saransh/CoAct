@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { useRouter } from "next/navigation";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import Image from "next/image";
@@ -30,10 +31,16 @@ export default function Home() {
     }
   }, []);
 
+  const router = useRouter();
+
   const safeNavigate = (target: string) => {
     if (isNavigating) return;
     setIsNavigating(true);
-    window.location.assign(target);
+    try {
+      router.push(target);
+    } catch {
+      window.location.assign(target);
+    }
   };
 
   const handleJoin = (e: React.FormEvent) => {

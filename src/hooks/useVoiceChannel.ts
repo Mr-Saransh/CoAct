@@ -1,37 +1,11 @@
 import { useEffect, useRef, useState, useCallback } from "react";
 
-// Robust STUN and TURN fallback configuration for cross-network reliability
-const ICE_SERVERS: RTCIceServer[] = [
-  // Fast public Google STUN servers
-  { urls: "stun:stun.l.google.com:19302" },
-  { urls: "stun:stun1.l.google.com:19302" },
-  { urls: "stun:stun2.l.google.com:19302" },
-  // Cloudflare STUN
-  { urls: "stun:stun.cloudflare.com:3478" },
-  // Twilio STUN
-  { urls: "stun:global.stun.twilio.com:3478" },
-  // OpenRelay Public TURN Relay (Free WebRTC TURN relay supporting UDP, TCP, and TLS)
-  // Essential for traversing mobile carrier symmetric CGNAT (4G/5G) and enterprise firewalls
-  {
-    urls: [
-      "turn:openrelay.metered.ca:80",
-      "turn:openrelay.metered.ca:443",
-      "turn:openrelay.metered.ca:443?transport=tcp",
-      "turns:openrelay.metered.ca:443?transport=tcp",
-    ],
-    username: "openrelayproject",
-    credential: "openrelayproject",
-  },
+// Fast, verified STUN configuration for rapid ICE candidate gathering (<300ms)
+const DEFAULT_ICE_SERVERS: RTCIceServer[] = [
+  { urls: ["stun:stun.l.google.com:19302", "stun:stun1.l.google.com:19302"] },
+  { urls: ["stun:stun.cloudflare.com:3478"] },
+  { urls: ["stun:stun2.l.google.com:19302", "stun:stun3.l.google.com:19302"] },
 ];
-
-// Meeting-quality audio constraints optimized for Opus speech
-const AUDIO_CONSTRAINTS: MediaTrackConstraints = {
-  echoCancellation: true,
-  noiseSuppression: true,
-  autoGainControl: true,
-  channelCount: 1,
-  sampleRate: 48000,
-};
 
 export type VoiceState = "connected" | "connecting" | "reconnecting" | "disconnected";
 
@@ -40,6 +14,77 @@ export interface RemotePeerVoice {
   speaking: boolean;
   name: string;
   connectionState: RTCPeerConnectionState;
+}
+
+// Feature-detect low-latency audio constraints
+function getAudioConstraints(): MediaTrackConstraints {
+  if (typeof navigator === "undefined" || !navigator.mediaDevices?.getSupportedConstraints) {
+    return {
+      echoCancellation: true,
+      noiseSuppression: true,
+      autoGainControl: true,
+    };
+  }
+
+  const supported = navigator.mediaDevices.getSupportedConstraints();
+  const constraints: MediaTrackConstraints = {};
+
+  if (supported.echoCancellation) constraints.echoCancellation = true;
+  if (supported.noiseSuppression) constraints.noiseSuppression = true;
+  if (supported.autoGainControl) constraints.autoGainControl = true;
+  if (supported.channelCount) constraints.channelCount = 1;
+  if ((supported as any).latency) (constraints as any).latency = 0; // Target low latency hint
+
+  return constraints;
+}
+
+// Create a silent initial dummy track so SDP negotiates a true bidirectional a=sendrecv RTP session
+// before microphone permission is granted. When unmuting, replaceTrack swaps in the live mic instantly.
+function createSilentTrack(): { track: MediaStreamTrack; cleanup: () => void } | null {
+  try {
+    const AudioContextClass = (window as any).AudioContext || (window as any).webkitAudioContext;
+    if (!AudioContextClass) return null;
+    const ctx = new AudioContextClass();
+    const osc = ctx.createOscillator();
+    const dst = ctx.createMediaStreamDestination();
+    osc.connect(dst);
+    osc.start();
+    const track = dst.stream.getAudioTracks()[0];
+    track.enabled = false; // SILENT
+    return {
+      track,
+      cleanup: () => {
+        try {
+          track.stop();
+          osc.stop();
+          ctx.close();
+        } catch {}
+      },
+    };
+  } catch {
+    return null;
+  }
+}
+
+// Stable, active DOM container for remote audio playback
+function getOrCreateAudioContainer(): HTMLElement {
+  let container = document.getElementById("coact-remote-audio-container");
+  if (!container) {
+    container = document.createElement("div");
+    container.id = "coact-remote-audio-container";
+    container.setAttribute("aria-hidden", "true");
+    container.style.position = "fixed";
+    container.style.bottom = "0";
+    container.style.right = "0";
+    container.style.width = "2px";
+    container.style.height = "2px";
+    container.style.opacity = "0.01"; // Never 0 so power savers don't suspend playback
+    container.style.overflow = "hidden";
+    container.style.pointerEvents = "none";
+    container.style.zIndex = "-1";
+    document.body.appendChild(container);
+  }
+  return container;
 }
 
 export function useVoiceChannel(
@@ -55,6 +100,8 @@ export function useVoiceChannel(
 
   const pcRef = useRef<Record<string, RTCPeerConnection>>({});
   const localStreamRef = useRef<MediaStream | null>(null);
+  const silentTrackCleanupRef = useRef<(() => void) | null>(null);
+  const initialSilentTrackRef = useRef<MediaStreamTrack | null>(null);
   const analyserRef = useRef<AnalyserNode | null>(null);
   const audioCtxRef = useRef<AudioContext | null>(null);
   const animFrameRef = useRef<number>(0);
@@ -67,15 +114,33 @@ export function useVoiceChannel(
   const sendersRef = useRef<Record<string, RTCRtpSender>>({});
   const iceCandidateQueueRef = useRef<Record<string, RTCIceCandidateInit[]>>({});
 
-  // Direct Audio element management for remote playback
+  // Direct Audio element management inside DOM
   const audioElementsRef = useRef<Record<string, HTMLAudioElement>>({});
   const remoteAnalysersRef = useRef<Record<string, { analyser: AnalyserNode; animFrame: number }>>({});
+  const analysersActiveRef = useRef(true);
+
+  // Initialize silent track for instant sendrecv SDP negotiation
+  useEffect(() => {
+    const silent = createSilentTrack();
+    if (silent) {
+      initialSilentTrackRef.current = silent.track;
+      silentTrackCleanupRef.current = silent.cleanup;
+    }
+    return () => {
+      silentTrackCleanupRef.current?.();
+      initialSilentTrackRef.current = null;
+    };
+  }, []);
 
   // Global Audio Unlocker for browser autoplay policies
   const unlockAllAudio = useCallback(() => {
     Object.values(audioElementsRef.current).forEach((audio) => {
-      if (audio.paused && audio.srcObject) {
-        audio.play().catch(() => {});
+      if (audio.srcObject) {
+        audio.muted = false;
+        audio.volume = 1.0;
+        if (audio.paused) {
+          audio.play().catch(() => {});
+        }
       }
     });
     if (audioCtxRef.current && audioCtxRef.current.state === "suspended") {
@@ -97,7 +162,7 @@ export function useVoiceChannel(
     };
   }, [unlockAllAudio]);
 
-  // Evaluate aggregate voice connection state
+  // Aggregate connection state evaluator
   const updateAggregateState = useCallback(() => {
     const pcs = Object.values(pcRef.current);
     if (pcs.length === 0) {
@@ -129,92 +194,36 @@ export function useVoiceChannel(
     setVoiceState("connected");
   }, []);
 
-  // Cleanup single peer
-  const cleanupPeer = useCallback((targetId: string) => {
-    // Stop remote audio
-    const audio = audioElementsRef.current[targetId];
-    if (audio) {
-      audio.pause();
-      audio.srcObject = null;
-      delete audioElementsRef.current[targetId];
-    }
-
-    // Stop remote audio analysis
-    const remoteAnalyser = remoteAnalysersRef.current[targetId];
-    if (remoteAnalyser) {
-      cancelAnimationFrame(remoteAnalyser.animFrame);
-      delete remoteAnalysersRef.current[targetId];
-    }
-
-    // Close and clean peer connection
-    if (pcRef.current[targetId]) {
-      try {
-        pcRef.current[targetId].close();
-      } catch (e) {
-        console.warn("[voice] Error closing PC:", e);
-      }
-      delete pcRef.current[targetId];
-    }
-
-    delete makingOfferRef.current[targetId];
-    delete ignoreOfferRef.current[targetId];
-    delete isSettingRemoteAnswerPendingRef.current[targetId];
-    delete peerNamesRef.current[targetId];
-    delete sendersRef.current[targetId];
-    delete iceCandidateQueueRef.current[targetId];
-
-    setPeers((prev) => {
-      const next = { ...prev };
-      delete next[targetId];
-      return next;
-    });
-
-    updateAggregateState();
-  }, [updateAggregateState]);
-
-  // Clean up everything on unmount
-  const cleanupAll = useCallback(() => {
-    cancelAnimationFrame(animFrameRef.current);
-    Object.keys(pcRef.current).forEach((targetId) => {
-      cleanupPeer(targetId);
-    });
-    pcRef.current = {};
-
-    if (localStreamRef.current) {
-      localStreamRef.current.getTracks().forEach((t) => t.stop());
-      localStreamRef.current = null;
-      setLocalStream(null);
-    }
-
-    if (audioCtxRef.current && audioCtxRef.current.state !== "closed") {
-      audioCtxRef.current.close().catch(() => {});
-      audioCtxRef.current = null;
-    }
-    analyserRef.current = null;
-    iceCandidateQueueRef.current = {};
-    setPeers({});
-    setIsSpeaking(false);
-  }, [cleanupPeer]);
-
-  // Play remote audio safely
+  // Safe remote audio playback attached to active document layout tree
   const attachRemoteAudio = useCallback((targetId: string, stream: MediaStream) => {
+    const container = getOrCreateAudioContainer();
     let audio = audioElementsRef.current[targetId];
-    if (!audio) {
-      audio = new Audio();
+
+    if (!audio || !container.contains(audio)) {
+      audio = document.createElement("audio");
+      audio.id = `remote-audio-${targetId}`;
       audio.autoplay = true;
       (audio as any).playsInline = true;
+      audio.setAttribute("playsinline", "true");
+      (audio as any).webkitPlaysInline = true;
+      audio.muted = false;
       audio.volume = 1.0;
+      container.appendChild(audio);
       audioElementsRef.current[targetId] = audio;
     }
+
     if (audio.srcObject !== stream) {
       audio.srcObject = stream;
     }
-    audio.play().catch(() => {
-      // Browsers may pause until user interaction
+
+    audio.muted = false;
+    audio.volume = 1.0;
+    audio.play().catch((err) => {
+      console.log(`[voice] Autoplay blocked for ${targetId} (${err.name}); will unlock on user interaction`);
     });
   }, []);
 
-  // Setup speaking detection on remote streams
+  // Remote audio analysis for speaking indicators
   const setupRemoteAudioAnalysis = useCallback((targetId: string, stream: MediaStream) => {
     try {
       const AudioContextClass = (window as any).AudioContext || (window as any).webkitAudioContext;
@@ -262,9 +271,78 @@ export function useVoiceChannel(
     }
   }, []);
 
-  const analysersActiveRef = useRef(true);
+  // Cleanup single peer
+  const cleanupPeer = useCallback(
+    (targetId: string) => {
+      // Remove remote audio element from DOM
+      const audio = audioElementsRef.current[targetId];
+      if (audio) {
+        audio.pause();
+        audio.srcObject = null;
+        audio.remove();
+        delete audioElementsRef.current[targetId];
+      }
 
-  // Setup Peer Connection with Perfect Negotiation
+      // Stop remote audio analyser
+      const remoteAnalyser = remoteAnalysersRef.current[targetId];
+      if (remoteAnalyser) {
+        cancelAnimationFrame(remoteAnalyser.animFrame);
+        delete remoteAnalysersRef.current[targetId];
+      }
+
+      // Close RTCPeerConnection
+      if (pcRef.current[targetId]) {
+        try {
+          pcRef.current[targetId].close();
+        } catch (e) {
+          console.warn("[voice] Error closing PC:", e);
+        }
+        delete pcRef.current[targetId];
+      }
+
+      delete makingOfferRef.current[targetId];
+      delete ignoreOfferRef.current[targetId];
+      delete isSettingRemoteAnswerPendingRef.current[targetId];
+      delete peerNamesRef.current[targetId];
+      delete sendersRef.current[targetId];
+      delete iceCandidateQueueRef.current[targetId];
+
+      setPeers((prev) => {
+        const next = { ...prev };
+        delete next[targetId];
+        return next;
+      });
+
+      updateAggregateState();
+    },
+    [updateAggregateState]
+  );
+
+  // Cleanup all connections on unmount
+  const cleanupAll = useCallback(() => {
+    cancelAnimationFrame(animFrameRef.current);
+    Object.keys(pcRef.current).forEach((targetId) => {
+      cleanupPeer(targetId);
+    });
+    pcRef.current = {};
+
+    if (localStreamRef.current) {
+      localStreamRef.current.getTracks().forEach((t) => t.stop());
+      localStreamRef.current = null;
+      setLocalStream(null);
+    }
+
+    if (audioCtxRef.current && audioCtxRef.current.state !== "closed") {
+      audioCtxRef.current.close().catch(() => {});
+      audioCtxRef.current = null;
+    }
+    analyserRef.current = null;
+    iceCandidateQueueRef.current = {};
+    setPeers({});
+    setIsSpeaking(false);
+  }, [cleanupPeer]);
+
+  // Setup single Peer Connection with W3C Perfect Negotiation
   const createPC = useCallback(
     (targetId: string, targetName: string): RTCPeerConnection => {
       if (pcRef.current[targetId]) return pcRef.current[targetId];
@@ -276,29 +354,31 @@ export function useVoiceChannel(
       iceCandidateQueueRef.current[targetId] = [];
 
       const pc = new RTCPeerConnection({
-        iceServers: ICE_SERVERS,
+        iceServers: DEFAULT_ICE_SERVERS,
         iceCandidatePoolSize: 2,
       });
 
-      // Perfect negotiation: Polite peer is deterministically decided by socket IDs
+      // Perfect Negotiation: Polite peer is deterministically decided by socket IDs
       const isPolite = socket.id > targetId;
 
-      // Add audio transceiver with sendrecv direction so SDP always negotiates bidirectional audio
-      if (localStreamRef.current && localStreamRef.current.getAudioTracks().length > 0) {
-        const track = localStreamRef.current.getAudioTracks()[0];
+      // Attach audio track: use active mic track if unmuted, or silent dummy track
+      // to ensure SDP always carries m=audio with a=sendrecv
+      const trackToAttach =
+        (localStreamRef.current && localStreamRef.current.getAudioTracks()[0]) ||
+        initialSilentTrackRef.current;
+
+      if (trackToAttach) {
         try {
-          const sender = pc.addTrack(track, localStreamRef.current);
+          const sender = pc.addTrack(trackToAttach, new MediaStream([trackToAttach]));
           sendersRef.current[targetId] = sender;
         } catch (e) {
-          console.warn("[voice] addTrack error:", e);
-        }
-      } else {
-        try {
+          console.warn("[voice] addTrack error, adding transceiver fallback:", e);
           const transceiver = pc.addTransceiver("audio", { direction: "sendrecv" });
           sendersRef.current[targetId] = transceiver.sender;
-        } catch (e) {
-          console.warn("[voice] addTransceiver warning:", e);
         }
+      } else {
+        const transceiver = pc.addTransceiver("audio", { direction: "sendrecv" });
+        sendersRef.current[targetId] = transceiver.sender;
       }
 
       // ICE Candidate forwarding
@@ -332,6 +412,7 @@ export function useVoiceChannel(
           },
         }));
 
+        remoteTrack.enabled = true;
         remoteTrack.onunmute = () => {
           attachRemoteAudio(targetId, remoteStream);
         };
@@ -367,7 +448,7 @@ export function useVoiceChannel(
         if (pc.iceConnectionState === "failed") {
           try {
             pc.restartIce();
-          } catch (e) {}
+          } catch {}
         }
       };
 
@@ -410,7 +491,7 @@ export function useVoiceChannel(
     if (!socket || !sessionId) return;
     analysersActiveRef.current = true;
 
-    // Join voice signaling room immediately
+    // Join voice signaling room
     socket.emit("voice:join", { sessionId, userName });
 
     // Handle existing peers sent by the server upon joining
@@ -481,12 +562,12 @@ export function useVoiceChannel(
             try {
               await pc.addIceCandidate(new RTCIceCandidate(cand));
             } catch (candErr) {
-              console.warn("[voice] Error adding queued ICE candidate:", candErr);
+              console.warn("[voice] Error adding queued candidate:", candErr);
             }
           }
 
           if (desc.type === "offer") {
-            // Respond with answer
+            // Answer
             await pc.setLocalDescription();
             socket.emit("voice:signal", {
               sessionId,
@@ -523,14 +604,14 @@ export function useVoiceChannel(
       cleanupPeer(targetId);
     };
 
-    // Auto-recover on network changes (WiFi -> Mobile data, wake from sleep, etc.)
+    // Auto-recover on network changes (WiFi -> Mobile data, sleep/wake)
     const onOnline = () => {
       console.log("[voice] Network online detected. Restarting ICE on all connections...");
       socket.emit("voice:join", { sessionId, userName });
       Object.values(pcRef.current).forEach((pc) => {
         try {
           pc.restartIce();
-        } catch (e) {}
+        } catch {}
       });
     };
 
@@ -625,7 +706,9 @@ export function useVoiceChannel(
           }
 
           try {
-            const stream = await navigator.mediaDevices.getUserMedia({ audio: AUDIO_CONSTRAINTS });
+            const stream = await navigator.mediaDevices.getUserMedia({
+              audio: getAudioConstraints(),
+            });
             if (!active) {
               stream.getTracks().forEach((t) => t.stop());
               return;
@@ -640,7 +723,7 @@ export function useVoiceChannel(
               track.enabled = true;
             }
 
-            // Attach to all active peer connections
+            // Attach to all active peer connections via replaceTrack
             Object.entries(pcRef.current).forEach(([targetId, pc]) => {
               const sender = sendersRef.current[targetId];
               if (sender) {
@@ -679,6 +762,56 @@ export function useVoiceChannel(
       active = false;
     };
   }, [isMicOn]);
+
+  // Audio Diagnostics Exporter (Requirement 7)
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      (window as any).__COACT_VOICE_DIAGNOSTICS__ = {
+        getDiagnostics: async () => {
+          const report: Record<string, any> = {};
+          for (const [targetId, pc] of Object.entries(pcRef.current)) {
+            const stats = await pc.getStats();
+            let bytesReceived = 0;
+            let bytesSent = 0;
+            let packetsLost = 0;
+            let jitter = 0;
+            let selectedCandidatePair: any = null;
+
+            stats.forEach((stat) => {
+              if (stat.type === "inbound-rtp" && stat.kind === "audio") {
+                bytesReceived = stat.bytesReceived || 0;
+                packetsLost = stat.packetsLost || 0;
+                jitter = stat.jitter || 0;
+              }
+              if (stat.type === "outbound-rtp" && stat.kind === "audio") {
+                bytesSent = stat.bytesSent || 0;
+              }
+              if (stat.type === "candidate-pair" && (stat.selected || stat.nominated)) {
+                selectedCandidatePair = {
+                  state: stat.state,
+                  currentRoundTripTime: stat.currentRoundTripTime,
+                };
+              }
+            });
+
+            report[targetId] = {
+              name: peerNamesRef.current[targetId],
+              connectionState: pc.connectionState,
+              iceConnectionState: pc.iceConnectionState,
+              signalingState: pc.signalingState,
+              iceGatheringState: pc.iceGatheringState,
+              bytesReceived,
+              bytesSent,
+              packetsLost,
+              jitter,
+              selectedCandidatePair,
+            };
+          }
+          return report;
+        },
+      };
+    }
+  }, []);
 
   return {
     peers,

@@ -1,8 +1,9 @@
 "use client";
 
-import { Suspense, useState, useEffect, useCallback, useRef } from "react";
+import { Suspense, useState, useEffect, useCallback, useRef, memo } from "react";
 import Image from "next/image";
-import { useParams, useSearchParams } from "next/navigation";
+import { useParams, useSearchParams, useRouter } from "next/navigation";
+import dynamic from "next/dynamic";
 import { useSession } from "@/hooks/useSession";
 import { useSocket } from "@/components/providers/SocketProvider";
 import { Card, CardContent } from "@/components/ui/card";
@@ -11,36 +12,32 @@ import { Input } from "@/components/ui/input";
 import { WifiOff, ArrowRight, Users, MessageCircle, Mic, ShieldOff, AlertTriangle } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Skeleton } from "@/components/ui/skeleton";
-import { ThinkingBoard } from "@/components/activities/ThinkingBoard";
-import { LivePollParticipant } from "@/components/activities/LivePoll";
-import { QuizParticipant } from "@/components/activities/Quiz";
-import { QAParticipant } from "@/components/activities/QABoard";
-import { FocusTimerParticipant } from "@/components/activities/FocusTimer";
-import { TaskTrackerParticipant } from "@/components/activities/TaskTracker";
-import { FITBParticipant } from "@/components/activities/FillInTheBlank";
-import { WordChainParticipant } from "@/components/activities/WordChain";
-import { MostLikelyParticipant } from "@/components/activities/MostLikelyTo";
-import { GroupStudyParticipant } from "@/components/activities/GroupStudy";
-import { UnoParticipant } from "@/components/activities/UnoGame";
-import { LudoParticipant } from "@/components/activities/LudoGame";
 import { SessionControls } from "@/components/session/SessionControls";
 import { SessionFloatingController } from "@/components/session/SessionFloatingController";
-
-// New DECIDE components
-import { ThoughtMapParticipant } from "@/components/activities/ThoughtMap";
-import { CourtroomParticipant } from "@/components/activities/CourtroomMode";
-import { DuelDebateParticipant } from "@/components/activities/DuelDebate";
-import { DecisionEngineParticipant } from "@/components/activities/DecisionEngine";
-
-
-import RMCSGame from "@/components/activities/RMCSGame";
-
 
 function LoadingSpinner() {
   return (
     <div className="w-10 h-10 border-4 border-primary/30 border-t-primary rounded-full animate-spin mx-auto" />
   );
 }
+
+// Lazy-loaded Activity components to eliminate monolithic bundle and boost navigation speed
+const ThinkingBoard = dynamic(() => import("@/components/activities/ThinkingBoard").then(m => m.ThinkingBoard), { ssr: false, loading: () => <LoadingSpinner /> });
+const LivePollParticipant = dynamic(() => import("@/components/activities/LivePoll").then(m => m.LivePollParticipant), { ssr: false, loading: () => <LoadingSpinner /> });
+const QuizParticipant = dynamic(() => import("@/components/activities/Quiz").then(m => m.QuizParticipant), { ssr: false, loading: () => <LoadingSpinner /> });
+const QAParticipant = dynamic(() => import("@/components/activities/QABoard").then(m => m.QAParticipant), { ssr: false, loading: () => <LoadingSpinner /> });
+const FocusTimerParticipant = dynamic(() => import("@/components/activities/FocusTimer").then(m => m.FocusTimerParticipant), { ssr: false, loading: () => <LoadingSpinner /> });
+const TaskTrackerParticipant = dynamic(() => import("@/components/activities/TaskTracker").then(m => m.TaskTrackerParticipant), { ssr: false, loading: () => <LoadingSpinner /> });
+const FITBParticipant = dynamic(() => import("@/components/activities/FillInTheBlank").then(m => m.FITBParticipant), { ssr: false, loading: () => <LoadingSpinner /> });
+const WordChainParticipant = dynamic(() => import("@/components/activities/WordChain").then(m => m.WordChainParticipant), { ssr: false, loading: () => <LoadingSpinner /> });
+const MostLikelyParticipant = dynamic(() => import("@/components/activities/MostLikelyTo").then(m => m.MostLikelyParticipant), { ssr: false, loading: () => <LoadingSpinner /> });
+const GroupStudyParticipant = dynamic(() => import("@/components/activities/GroupStudy").then(m => m.GroupStudyParticipant), { ssr: false, loading: () => <LoadingSpinner /> });
+const UnoParticipant = dynamic(() => import("@/components/activities/UnoGame").then(m => m.UnoParticipant), { ssr: false, loading: () => <LoadingSpinner /> });
+const LudoParticipant = dynamic(() => import("@/components/activities/LudoGame").then(m => m.LudoParticipant), { ssr: false, loading: () => <LoadingSpinner /> });
+const ThoughtMapParticipant = dynamic(() => import("@/components/activities/ThoughtMap").then(m => m.ThoughtMapParticipant), { ssr: false, loading: () => <LoadingSpinner /> });
+const CourtroomParticipant = dynamic(() => import("@/components/activities/CourtroomMode").then(m => m.CourtroomParticipant), { ssr: false, loading: () => <LoadingSpinner /> });
+const DuelDebateParticipant = dynamic(() => import("@/components/activities/DuelDebate").then(m => m.DuelDebateParticipant), { ssr: false, loading: () => <LoadingSpinner /> });
+const DecisionEngineParticipant = dynamic(() => import("@/components/activities/DecisionEngine").then(m => m.DecisionEngineParticipant), { ssr: false, loading: () => <LoadingSpinner /> });
 
 function NameEntry({ sessionId, onJoin, error }: { sessionId: string; onJoin: (name: string) => void; error?: string | null }) {
   const [name, setName] = useState("");
@@ -109,7 +106,7 @@ function NameEntry({ sessionId, onJoin, error }: { sessionId: string; onJoin: (n
   );
 }
 
-function Lobby({ session, userName }: { 
+const Lobby = memo(function Lobby({ session, userName }: { 
   session: NonNullable<ReturnType<typeof useSession>["session"]>; 
   userName: string;
 }) {
@@ -171,9 +168,9 @@ function Lobby({ session, userName }: {
       </div>
     </div>
   );
-}
+});
 
-function ActivityView({ session, userName, socket }: {
+const ActivityView = memo(function ActivityView({ session, userName, socket }: {
   session: NonNullable<ReturnType<typeof useSession>["session"]>;
   userName: string;
   socket: any;
@@ -198,8 +195,6 @@ function ActivityView({ session, userName, socket }: {
     if (mode === "courtroom") return <CourtroomParticipant session={session} socket={socket} userName={userName} />;
     if (mode === "duel") return <DuelDebateParticipant session={session} socket={socket} userName={userName} />;
     if (mode === "decision") return <DecisionEngineParticipant session={session} socket={socket} userName={userName} />;
-
-    if (mode === "rmcs") return <RMCSGame session={session} socket={socket} userName={userName} isHost={false} />;
 
     return (
       <div className="w-full max-w-2xl text-center p-8 bg-[#121826] rounded-3xl border border-white/10 relative z-20">
@@ -253,7 +248,7 @@ function ActivityView({ session, userName, socket }: {
       </main>
     </div>
   );
-}
+});
 
 function SessionContent() {
   const { id } = useParams();
@@ -337,24 +332,25 @@ function SessionContent() {
     setHasUnreadChat(false);
   }, []);
 
+  const router = useRouter();
+
   const handleLeaveSession = useCallback(() => {
-    window.location.href = "/";
-  }, []);
+    try {
+      router.push("/");
+    } catch {
+      window.location.href = "/";
+    }
+  }, [router]);
 
   const safeNavigate = useCallback((target: string) => {
     if (isRedirecting) return;
     setIsRedirecting(true);
     try {
-      window.location.assign(target);
-      setTimeout(() => {
-        if (window.location.pathname + window.location.search !== target) {
-          window.location.href = target;
-        }
-      }, 150);
+      router.replace(target);
     } catch {
-      window.location.href = target;
+      window.location.assign(target);
     }
-  }, [isRedirecting]);
+  }, [isRedirecting, router]);
 
   useEffect(() => {
     if (session && userId && session.hostId === userId) {

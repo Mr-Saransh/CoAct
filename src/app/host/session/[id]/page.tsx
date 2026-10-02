@@ -2,7 +2,7 @@
 
 import { Suspense, useState, useEffect, useCallback, useRef } from "react";
 import Image from "next/image";
-import { useParams, useSearchParams } from "next/navigation";
+import { useParams, useSearchParams, useRouter } from "next/navigation";
 import dynamic from "next/dynamic";
 import { useSession } from "@/hooks/useSession";
 import { useSocket } from "@/components/providers/SocketProvider";
@@ -13,28 +13,32 @@ import {
 } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { motion, AnimatePresence } from "framer-motion";
-import { ThinkingBoard } from "@/components/activities/ThinkingBoard";
-import { LivePollHost } from "@/components/activities/LivePoll";
-import { QuizHost } from "@/components/activities/Quiz";
-import { QAHost } from "@/components/activities/QABoard";
-import { FocusTimerHost } from "@/components/activities/FocusTimer";
-import { TaskTrackerHost } from "@/components/activities/TaskTracker";
-import { FITBHost } from "@/components/activities/FillInTheBlank";
-import { WordChainHost } from "@/components/activities/WordChain";
-import { MostLikelyHost } from "@/components/activities/MostLikelyTo";
-import { GroupStudyHost } from "@/components/activities/GroupStudy";
-import { UnoHost } from "@/components/activities/UnoGame";
-import { LudoHost } from "@/components/activities/LudoGame";
-// Decision components
-import { ThoughtMapHost } from "@/components/activities/ThoughtMap";
-import { CourtroomHost } from "@/components/activities/CourtroomMode";
-import { DuelDebateHost } from "@/components/activities/DuelDebate";
-import { DecisionEngineHost } from "@/components/activities/DecisionEngine";
 import { SessionControls } from "@/components/session/SessionControls";
 import { SessionFloatingController } from "@/components/session/SessionFloatingController";
 
+function LoadingSpinner() {
+  return (
+    <div className="w-10 h-10 border-4 border-primary/30 border-t-primary rounded-full animate-spin mx-auto" />
+  );
+}
 
-import RMCSGame from "@/components/activities/RMCSGame";
+// Lazy-loaded Activity components to eliminate monolithic bundle and boost navigation speed
+const ThinkingBoard = dynamic(() => import("@/components/activities/ThinkingBoard").then(m => m.ThinkingBoard), { ssr: false, loading: () => <LoadingSpinner /> });
+const LivePollHost = dynamic(() => import("@/components/activities/LivePoll").then(m => m.LivePollHost), { ssr: false, loading: () => <LoadingSpinner /> });
+const QuizHost = dynamic(() => import("@/components/activities/Quiz").then(m => m.QuizHost), { ssr: false, loading: () => <LoadingSpinner /> });
+const QAHost = dynamic(() => import("@/components/activities/QABoard").then(m => m.QAHost), { ssr: false, loading: () => <LoadingSpinner /> });
+const FocusTimerHost = dynamic(() => import("@/components/activities/FocusTimer").then(m => m.FocusTimerHost), { ssr: false, loading: () => <LoadingSpinner /> });
+const TaskTrackerHost = dynamic(() => import("@/components/activities/TaskTracker").then(m => m.TaskTrackerHost), { ssr: false, loading: () => <LoadingSpinner /> });
+const FITBHost = dynamic(() => import("@/components/activities/FillInTheBlank").then(m => m.FITBHost), { ssr: false, loading: () => <LoadingSpinner /> });
+const WordChainHost = dynamic(() => import("@/components/activities/WordChain").then(m => m.WordChainHost), { ssr: false, loading: () => <LoadingSpinner /> });
+const MostLikelyHost = dynamic(() => import("@/components/activities/MostLikelyTo").then(m => m.MostLikelyHost), { ssr: false, loading: () => <LoadingSpinner /> });
+const GroupStudyHost = dynamic(() => import("@/components/activities/GroupStudy").then(m => m.GroupStudyHost), { ssr: false, loading: () => <LoadingSpinner /> });
+const UnoHost = dynamic(() => import("@/components/activities/UnoGame").then(m => m.UnoHost), { ssr: false, loading: () => <LoadingSpinner /> });
+const LudoHost = dynamic(() => import("@/components/activities/LudoGame").then(m => m.LudoHost), { ssr: false, loading: () => <LoadingSpinner /> });
+const ThoughtMapHost = dynamic(() => import("@/components/activities/ThoughtMap").then(m => m.ThoughtMapHost), { ssr: false, loading: () => <LoadingSpinner /> });
+const CourtroomHost = dynamic(() => import("@/components/activities/CourtroomMode").then(m => m.CourtroomHost), { ssr: false, loading: () => <LoadingSpinner /> });
+const DuelDebateHost = dynamic(() => import("@/components/activities/DuelDebate").then(m => m.DuelDebateHost), { ssr: false, loading: () => <LoadingSpinner /> });
+const DecisionEngineHost = dynamic(() => import("@/components/activities/DecisionEngine").then(m => m.DecisionEngineHost), { ssr: false, loading: () => <LoadingSpinner /> });
 
 const QRCodeSVG = dynamic(() => import("qrcode.react").then((m) => m.QRCodeSVG), {
   ssr: false,
@@ -58,8 +62,6 @@ const ACTIVITIES = {
     { id: "trivia",    label: "Trivia Night",    desc: "Challenge your group with fast-paced general knowledge.", icon: Gamepad2, image: "/games/trivia.jpg" },
     { id: "wordchain", label: "Word Chain",      desc: "A fast-thinking vocabulary game for the whole team.", icon: Gamepad2, image: "/games/wordchain.jpg" },
     { id: "mostlikely",label: "Most Likely To",  desc: "Discover what your friends really think with fun group votes.", icon: Gamepad2, image: "/games/mostlikely.jpg" },
-
-    { id: "rmcs",      label: "RMCS Royale",     desc: "Raja Mantri Chor Sipahi - The classic social deduction game.", icon: Gamepad2, image: "/games/rmcs.jpg" },
     { id: "uno",       label: "UNO Cards",       desc: "The classic card game experience, now fully real-time.", icon: Gamepad2, image: "/games/uno.jpg" },
     { id: "ludo",      label: "Ludo Royale",     desc: "A premium, high-fidelity board game for up to 4 players.", icon: Gamepad2, image: "/games/ludo.jpg" },
   ],
@@ -77,12 +79,6 @@ const CATEGORY_INFO = {
   play: { title: "Play", desc: "Make learning fun with quizzes, games and challenges.", icon: Gamepad2, color: "purple" },
   decide: { title: "Decide", desc: "Structured tools to discuss, debate and reach fair decisions.", icon: Scale, color: "orange" }
 };
-
-function LoadingSpinner() {
-  return (
-    <div className="w-10 h-10 border-4 border-primary/30 border-t-primary rounded-full animate-spin mx-auto" />
-  );
-}
 
 function InvitePanel({ sessionId, open, onClose }: { sessionId: string; open: boolean; onClose: () => void }) {
   const [copied, setCopied] = useState(false);
@@ -187,20 +183,17 @@ function HostSessionContent() {
     setActiveCategory(cat);
   };
 
+  const router = useRouter();
+
   const safeNavigate = useCallback((target: string) => {
     if (isRedirecting) return;
     setIsRedirecting(true);
     try {
-      window.location.assign(target);
-      setTimeout(() => {
-        if (window.location.pathname + window.location.search !== target) {
-          window.location.href = target;
-        }
-      }, 150);
+      router.replace(target);
     } catch {
-      window.location.href = target;
+      window.location.assign(target);
     }
-  }, [isRedirecting]);
+  }, [isRedirecting, router]);
 
   useEffect(() => {
     if (session && userId && session.hostId !== userId) {
@@ -221,7 +214,14 @@ function HostSessionContent() {
     endActivity();
     setActiveCategory(cat);
   }, [endActivity]);
-  const handleEndSession = useCallback(() => { socket?.emit("session:end", { sessionId }); window.location.href = "/"; }, [socket, sessionId]);
+  const handleEndSession = useCallback(() => { 
+    socket?.emit("session:end", { sessionId }); 
+    try {
+      router.push("/");
+    } catch {
+      window.location.href = "/";
+    }
+  }, [socket, sessionId, router]);
   const handleOpenChat = useCallback(() => {
     setActivePanel(prev => prev === "chat" ? null : "chat");
     setHasUnreadChat(false);
@@ -444,7 +444,7 @@ function HostSessionContent() {
                   <div className="mt-4 pt-4 border-t border-white/10 flex flex-col gap-3 shrink-0 pb-10">
                     <button 
                       className="w-full flex items-center justify-center gap-2 py-3 rounded-xl border border-red-500/20 text-red-400 hover:bg-red-500 hover:text-white hover:border-red-500 transition-all shadow-[0_4px_20px_rgba(239,68,68,0.1)]" 
-                      onClick={() => { endActivity(); window.location.href = "/"; }}
+                      onClick={() => { endActivity(); handleEndSession(); }}
                     >
                       <StopCircle className="w-4 h-4" />
                       <span className="text-sm font-black uppercase tracking-wider">End Session</span>
@@ -501,8 +501,6 @@ function HostSessionContent() {
               currentMode === "courtroom" ? <CourtroomHost session={session} updateActivity={updateActivity} /> :
               currentMode === "duel" ? <DuelDebateHost session={session} socket={socket} updateActivity={updateActivity} /> :
               currentMode === "decision" ? <DecisionEngineHost session={session} updateActivity={updateActivity} /> :
-
-              currentMode === "rmcs" ? <RMCSGame session={session} socket={socket} userName={hostName} isHost={true} /> :
               null}
             </div>
           ) : (
@@ -616,7 +614,7 @@ function HostSessionContent() {
                           animate={{ opacity: 1, scale: 1 }}
                           className={`group cursor-pointer transition-all duration-300 hover:-translate-y-2`} 
                           onClick={() => {
-                            const needsSetup = ["poll", "quiz", "qa", "fitb", "trivia", "wordchain", "mostlikely", "study", "uno", "ludo", "thoughtmap", "courtroom", "duel", "decision", "rmcs"];
+                            const needsSetup = ["poll", "quiz", "qa", "fitb", "trivia", "wordchain", "mostlikely", "study", "uno", "ludo", "thoughtmap", "courtroom", "duel", "decision"];
                             startActivity(act.id as never, {}, needsSetup.includes(act.id) ? "waiting" : "live");
                           }}
                         >
@@ -739,7 +737,7 @@ function HostSessionContent() {
           socket={socket} 
           userName={hostName} 
           isHost={true} 
-          onLeave={() => window.location.href = "/"}
+          onLeave={() => { try { router.push("/"); } catch { window.location.href = "/"; } }}
           onBack={handleExitActivity}
           showBar={false}
           activePanel={activePanel}
