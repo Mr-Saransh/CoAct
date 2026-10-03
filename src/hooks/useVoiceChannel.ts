@@ -1,10 +1,19 @@
 import { useEffect, useRef, useState, useCallback } from "react";
 
-// Fast, verified STUN configuration for rapid ICE candidate gathering (<300ms)
+// Comprehensive STUN and TURN configuration for reliable cross-network connectivity (Laptop ↔ Phone/Tablet)
 const DEFAULT_ICE_SERVERS: RTCIceServer[] = [
-  { urls: ["stun:stun.l.google.com:19302", "stun:stun1.l.google.com:19302"] },
+  { urls: ["stun:stun.l.google.com:19302", "stun:stun1.l.google.com:19302", "stun:stun2.l.google.com:19302"] },
   { urls: ["stun:stun.cloudflare.com:3478"] },
-  { urls: ["stun:stun2.l.google.com:19302", "stun:stun3.l.google.com:19302"] },
+  { urls: ["stun:stun.relay.metered.ca:80"] },
+  {
+    urls: [
+      "turn:openrelay.metered.ca:80",
+      "turn:openrelay.metered.ca:443",
+      "turn:openrelay.metered.ca:443?transport=tcp",
+    ],
+    username: "openrelayproject",
+    credential: "openrelayproject",
+  },
 ];
 
 export type VoiceState = "connected" | "connecting" | "reconnecting" | "disconnected";
@@ -16,13 +25,14 @@ export interface RemotePeerVoice {
   connectionState: RTCPeerConnectionState;
 }
 
-// Feature-detect low-latency audio constraints
+// Clean, hardware-compatible audio constraints for reliable laptop and mobile mic capture
 function getAudioConstraints(): MediaTrackConstraints {
   if (typeof navigator === "undefined" || !navigator.mediaDevices?.getSupportedConstraints) {
     return {
       echoCancellation: true,
       noiseSuppression: true,
       autoGainControl: true,
+      channelCount: 1,
     };
   }
 
@@ -33,7 +43,7 @@ function getAudioConstraints(): MediaTrackConstraints {
   if (supported.noiseSuppression) constraints.noiseSuppression = true;
   if (supported.autoGainControl) constraints.autoGainControl = true;
   if (supported.channelCount) constraints.channelCount = 1;
-  if ((supported as any).latency) (constraints as any).latency = 0; // Target low latency hint
+  // Note: latency: 0 is deliberately omitted as it causes WASAPI OverconstrainedError / silence on Windows laptops
 
   return constraints;
 }
@@ -74,14 +84,13 @@ function getOrCreateAudioContainer(): HTMLElement {
     container.id = "coact-remote-audio-container";
     container.setAttribute("aria-hidden", "true");
     container.style.position = "fixed";
-    container.style.bottom = "0";
-    container.style.right = "0";
-    container.style.width = "2px";
-    container.style.height = "2px";
-    container.style.opacity = "0.01"; // Never 0 so power savers don't suspend playback
+    container.style.top = "-9999px";
+    container.style.left = "-9999px";
+    container.style.width = "10px";
+    container.style.height = "10px";
+    container.style.opacity = "1"; // Kept 1 so desktop browsers don't power-throttle or suspend playback
     container.style.overflow = "hidden";
     container.style.pointerEvents = "none";
-    container.style.zIndex = "-1";
     document.body.appendChild(container);
   }
   return container;
@@ -116,7 +125,10 @@ export function useVoiceChannel(
 
   // Direct Audio element management inside DOM
   const audioElementsRef = useRef<Record<string, HTMLAudioElement>>({});
+  const pendingAudioRef = useRef<Set<HTMLAudioElement>>(new Set());
   const remoteAnalysersRef = useRef<Record<string, { analyser: AnalyserNode; animFrame: number }>>({});
+  // CRITICAL FOR LAPTOP CHROMIUM: retain MediaStreamAudioSourceNode in ref to prevent V8 GC from silencing remote audio
+  const remoteSourcesRef = useRef<Record<string, MediaStreamAudioSourceNode>>({});
   const analysersActiveRef = useRef(true);
 
   // Initialize silent track for instant sendrecv SDP negotiation
@@ -132,8 +144,14 @@ export function useVoiceChannel(
     };
   }, []);
 
-  // Global Audio Unlocker for browser autoplay policies
+  // Global Audio Unlocker for browser autoplay policies (crucial for laptops)
   const unlockAllAudio = useCallback(() => {
+    // Resume shared AudioContext
+    if (audioCtxRef.current && audioCtxRef.current.state === "suspended") {
+      audioCtxRef.current.resume().catch(() => {});
+    }
+
+    // Play all registered remote audio elements
     Object.values(audioElementsRef.current).forEach((audio) => {
       if (audio.srcObject) {
         audio.muted = false;
@@ -143,9 +161,16 @@ export function useVoiceChannel(
         }
       }
     });
-    if (audioCtxRef.current && audioCtxRef.current.state === "suspended") {
-      audioCtxRef.current.resume().catch(() => {});
-    }
+
+    // Drain elements pending autoplay unlock
+    pendingAudioRef.current.forEach((audio) => {
+      if (audio.srcObject && audio.paused) {
+        audio.muted = false;
+        audio.volume = 1.0;
+        audio.play().catch(() => {});
+      }
+    });
+    pendingAudioRef.current.clear();
   }, []);
 
   useEffect(() => {
@@ -154,11 +179,13 @@ export function useVoiceChannel(
     window.addEventListener("touchstart", handleGesture, { passive: true });
     window.addEventListener("click", handleGesture, { passive: true });
     window.addEventListener("keydown", handleGesture, { passive: true });
+    window.addEventListener("focus", handleGesture, { passive: true });
     return () => {
       window.removeEventListener("pointerdown", handleGesture);
       window.removeEventListener("touchstart", handleGesture);
       window.removeEventListener("click", handleGesture);
       window.removeEventListener("keydown", handleGesture);
+      window.removeEventListener("focus", handleGesture);
     };
   }, [unlockAllAudio]);
 
@@ -218,12 +245,17 @@ export function useVoiceChannel(
 
     audio.muted = false;
     audio.volume = 1.0;
-    audio.play().catch((err) => {
-      console.log(`[voice] Autoplay blocked for ${targetId} (${err.name}); will unlock on user interaction`);
-    });
+
+    const playPromise = audio.play();
+    if (playPromise !== undefined) {
+      playPromise.catch((err) => {
+        console.log(`[voice] Autoplay blocked for ${targetId} (${err.name}); queued for interaction unlock`);
+        pendingAudioRef.current.add(audio);
+      });
+    }
   }, []);
 
-  // Remote audio analysis for speaking indicators
+  // Remote audio analysis for speaking indicators with strong reference retention
   const setupRemoteAudioAnalysis = useCallback((targetId: string, stream: MediaStream) => {
     try {
       const AudioContextClass = (window as any).AudioContext || (window as any).webkitAudioContext;
@@ -238,7 +270,17 @@ export function useVoiceChannel(
         ctx.resume().catch(() => {});
       }
 
+      // Clean up previous node if any
+      if (remoteSourcesRef.current[targetId]) {
+        try {
+          remoteSourcesRef.current[targetId].disconnect();
+        } catch {}
+      }
+
+      // Retain in ref to prevent V8 GC from silencing the stream
       const source = ctx.createMediaStreamSource(stream);
+      remoteSourcesRef.current[targetId] = source;
+
       const analyser = ctx.createAnalyser();
       analyser.fftSize = 256;
       source.connect(analyser);
@@ -248,7 +290,7 @@ export function useVoiceChannel(
         const data = new Uint8Array(analyser.frequencyBinCount);
         analyser.getByteFrequencyData(data);
         const avg = data.reduce((a, b) => a + b, 0) / data.length;
-        const isPeerSpeaking = avg > 14;
+        const isPeerSpeaking = avg > 12;
 
         setPeers((prev) => {
           if (!prev[targetId] || prev[targetId].speaking === isPeerSpeaking) return prev;
@@ -279,15 +321,22 @@ export function useVoiceChannel(
       if (audio) {
         audio.pause();
         audio.srcObject = null;
+        pendingAudioRef.current.delete(audio);
         audio.remove();
         delete audioElementsRef.current[targetId];
       }
 
-      // Stop remote audio analyser
+      // Stop remote audio analyser & disconnect source
       const remoteAnalyser = remoteAnalysersRef.current[targetId];
       if (remoteAnalyser) {
         cancelAnimationFrame(remoteAnalyser.animFrame);
         delete remoteAnalysersRef.current[targetId];
+      }
+      if (remoteSourcesRef.current[targetId]) {
+        try {
+          remoteSourcesRef.current[targetId].disconnect();
+        } catch {}
+        delete remoteSourcesRef.current[targetId];
       }
 
       // Close RTCPeerConnection
@@ -338,9 +387,36 @@ export function useVoiceChannel(
     }
     analyserRef.current = null;
     iceCandidateQueueRef.current = {};
+    pendingAudioRef.current.clear();
     setPeers({});
     setIsSpeaking(false);
   }, [cleanupPeer]);
+
+  // Full ICE restart renegotiation for reconnecting peers
+  const restartPeerIce = useCallback(
+    async (targetId: string) => {
+      const pc = pcRef.current[targetId];
+      if (!pc || pc.signalingState === "closed") return;
+      try {
+        console.log(`[voice] Initiating ICE restart with ${targetId}...`);
+        pc.restartIce();
+        makingOfferRef.current[targetId] = true;
+        await pc.setLocalDescription();
+        socket.emit("voice:signal", {
+          sessionId,
+          targetId,
+          signal: { sdp: pc.localDescription },
+          callerId: socket.id,
+          callerName: userName,
+        });
+      } catch (err) {
+        console.warn(`[voice] Error during ICE restart with ${targetId}:`, err);
+      } finally {
+        makingOfferRef.current[targetId] = false;
+      }
+    },
+    [sessionId, socket, userName]
+  );
 
   // Setup single Peer Connection with W3C Perfect Negotiation
   const createPC = useCallback(
@@ -356,6 +432,8 @@ export function useVoiceChannel(
       const pc = new RTCPeerConnection({
         iceServers: DEFAULT_ICE_SERVERS,
         iceCandidatePoolSize: 2,
+        bundlePolicy: "max-bundle",
+        rtcpMuxPolicy: "require",
       });
 
       // Perfect Negotiation: Polite peer is deterministically decided by socket IDs
@@ -363,16 +441,15 @@ export function useVoiceChannel(
 
       // Attach audio track: use active mic track if unmuted, or silent dummy track
       // to ensure SDP always carries m=audio with a=sendrecv
-      const trackToAttach =
-        (localStreamRef.current && localStreamRef.current.getAudioTracks()[0]) ||
-        initialSilentTrackRef.current;
+      const liveTrack = localStreamRef.current?.getAudioTracks().find((t) => t.readyState === "live");
+      const trackToAttach = liveTrack || initialSilentTrackRef.current;
 
       if (trackToAttach) {
         try {
           const sender = pc.addTrack(trackToAttach, new MediaStream([trackToAttach]));
           sendersRef.current[targetId] = sender;
         } catch (e) {
-          console.warn("[voice] addTrack error, adding transceiver fallback:", e);
+          console.warn("[voice] addTrack fallback to addTransceiver:", e);
           const transceiver = pc.addTransceiver("audio", { direction: "sendrecv" });
           sendersRef.current[targetId] = transceiver.sender;
         }
@@ -380,6 +457,24 @@ export function useVoiceChannel(
         const transceiver = pc.addTransceiver("audio", { direction: "sendrecv" });
         sendersRef.current[targetId] = transceiver.sender;
       }
+
+      // Codec optimization: prioritize Opus on audio transceivers
+      try {
+        if (pc.getTransceivers && (window as any).RTCRtpReceiver?.getCapabilities) {
+          pc.getTransceivers().forEach((tr) => {
+            if (tr.receiver?.track?.kind === "audio" && tr.setCodecPreferences) {
+              const caps = (window as any).RTCRtpReceiver.getCapabilities("audio");
+              if (caps?.codecs) {
+                const opus = caps.codecs.filter((c: any) => c.mimeType.toLowerCase() === "audio/opus");
+                const others = caps.codecs.filter((c: any) => c.mimeType.toLowerCase() !== "audio/opus");
+                if (opus.length > 0) {
+                  tr.setCodecPreferences([...opus, ...others]);
+                }
+              }
+            }
+          });
+        }
+      } catch {}
 
       // ICE Candidate forwarding
       pc.onicecandidate = (event) => {
@@ -415,6 +510,10 @@ export function useVoiceChannel(
         remoteTrack.enabled = true;
         remoteTrack.onunmute = () => {
           attachRemoteAudio(targetId, remoteStream);
+          const audio = audioElementsRef.current[targetId];
+          if (audio && audio.paused) {
+            audio.play().catch(() => pendingAudioRef.current.add(audio));
+          }
         };
 
         remoteTrack.onended = () => {
@@ -434,21 +533,14 @@ export function useVoiceChannel(
         });
 
         if (pc.connectionState === "failed") {
-          console.log(`[voice] Connection failed to ${targetId}, restarting ICE...`);
-          try {
-            pc.restartIce();
-          } catch (e) {
-            console.warn("[voice] restartIce error:", e);
-          }
+          restartPeerIce(targetId);
         }
       };
 
       pc.oniceconnectionstatechange = () => {
         updateAggregateState();
         if (pc.iceConnectionState === "failed") {
-          try {
-            pc.restartIce();
-          } catch {}
+          restartPeerIce(targetId);
         }
       };
 
@@ -483,6 +575,7 @@ export function useVoiceChannel(
       setupRemoteAudioAnalysis,
       cleanupPeer,
       updateAggregateState,
+      restartPeerIce,
     ]
   );
 
@@ -546,9 +639,10 @@ export function useVoiceChannel(
             return;
           }
 
-          if (offerCollision) {
-            // Polite peer yields by rolling back local description
-            await pc.setLocalDescription({ type: "rollback" } as RTCSessionDescriptionInit);
+          if (offerCollision && pc.signalingState === "have-local-offer") {
+            try {
+              await pc.setLocalDescription({ type: "rollback" } as RTCSessionDescriptionInit);
+            } catch {}
           }
 
           isSettingRemoteAnswerPendingRef.current[callerId] = desc.type === "answer";
@@ -560,13 +654,11 @@ export function useVoiceChannel(
           iceCandidateQueueRef.current[callerId] = [];
           for (const cand of queued) {
             try {
-              await pc.addIceCandidate(new RTCIceCandidate(cand));
-            } catch (candErr) {
-              console.warn("[voice] Error adding queued candidate:", candErr);
-            }
+              await pc.addIceCandidate(cand);
+            } catch {}
           }
 
-          if (desc.type === "offer") {
+          if (desc.type === "offer" && pc.signalingState === "have-remote-offer") {
             // Answer
             await pc.setLocalDescription();
             socket.emit("voice:signal", {
@@ -585,10 +677,8 @@ export function useVoiceChannel(
             iceCandidateQueueRef.current[callerId].push(signal.candidate);
           } else {
             try {
-              await pc.addIceCandidate(new RTCIceCandidate(signal.candidate));
-            } catch (e) {
-              console.warn("[voice] Error adding ICE candidate:", e);
-            }
+              await pc.addIceCandidate(signal.candidate);
+            } catch {}
           }
         }
       } catch (err) {
@@ -608,10 +698,8 @@ export function useVoiceChannel(
     const onOnline = () => {
       console.log("[voice] Network online detected. Restarting ICE on all connections...");
       socket.emit("voice:join", { sessionId, userName });
-      Object.values(pcRef.current).forEach((pc) => {
-        try {
-          pc.restartIce();
-        } catch {}
+      Object.keys(pcRef.current).forEach((targetId) => {
+        restartPeerIce(targetId);
       });
     };
 
@@ -649,7 +737,27 @@ export function useVoiceChannel(
       socket.emit("voice:leave", { sessionId });
       cleanupAll();
     };
-  }, [socket, sessionId, userName, createPC, cleanupPeer, cleanupAll, unlockAllAudio]);
+  }, [socket, sessionId, userName, createPC, cleanupPeer, cleanupAll, unlockAllAudio, restartPeerIce]);
+
+  // Periodic Playback Health Check: ensure remote audio remains audible across activity switches & power saving
+  useEffect(() => {
+    const interval = setInterval(() => {
+      Object.entries(audioElementsRef.current).forEach(([targetId, audio]) => {
+        const pc = pcRef.current[targetId];
+        const isConnected =
+          pc &&
+          (pc.connectionState === "connected" ||
+            pc.iceConnectionState === "connected" ||
+            pc.iceConnectionState === "completed");
+
+        if (isConnected && audio.srcObject && audio.paused) {
+          audio.play().catch(() => pendingAudioRef.current.add(audio));
+        }
+      });
+    }, 2500);
+
+    return () => clearInterval(interval);
+  }, []);
 
   // Local Microphone State Management
   useEffect(() => {
@@ -692,14 +800,21 @@ export function useVoiceChannel(
     const handleMicState = async () => {
       if (isMicOn) {
         // User explicitly unmuted
-        if (localStreamRef.current && localStreamRef.current.getAudioTracks().length > 0) {
-          // Re-enable existing track
+        const liveTrack = localStreamRef.current?.getAudioTracks().find((t) => t.readyState === "live");
+
+        if (liveTrack && localStreamRef.current) {
+          // Re-enable existing live track
           localStreamRef.current.getAudioTracks().forEach((t) => {
             t.enabled = true;
           });
           setupLocalAudioAnalysis(localStreamRef.current);
         } else {
-          // First time unmuting: request microphone permission cleanly
+          // Clean up old ended stream if any
+          if (localStreamRef.current) {
+            localStreamRef.current.getTracks().forEach((t) => t.stop());
+            localStreamRef.current = null;
+          }
+
           if (!navigator.mediaDevices?.getUserMedia) {
             console.error("[voice] getUserMedia not supported in this browser environment.");
             return;
@@ -717,10 +832,17 @@ export function useVoiceChannel(
             localStreamRef.current = stream;
             setLocalStream(stream);
 
-            // Enable track
+            // Enable track and monitor for device disconnect / end
             const track = stream.getAudioTracks()[0];
             if (track) {
               track.enabled = true;
+              track.onended = () => {
+                console.warn("[voice] Local mic track ended, cleaning reference");
+                if (localStreamRef.current === stream) {
+                  localStreamRef.current = null;
+                  setLocalStream(null);
+                }
+              };
             }
 
             // Attach to all active peer connections via replaceTrack
@@ -763,38 +885,58 @@ export function useVoiceChannel(
     };
   }, [isMicOn]);
 
-  // Audio Diagnostics Exporter (Requirement 7)
+  // Audio Diagnostics Exporter: comprehensive real-time statistics
   useEffect(() => {
     if (typeof window !== "undefined") {
       (window as any).__COACT_VOICE_DIAGNOSTICS__ = {
         getDiagnostics: async () => {
-          const report: Record<string, any> = {};
+          const report: Record<string, any> = {
+            local: {
+              isMicOn,
+              hasStream: !!localStreamRef.current,
+              trackCount: localStreamRef.current?.getAudioTracks().length || 0,
+              trackLive: localStreamRef.current?.getAudioTracks().some((t) => t.readyState === "live") || false,
+              trackEnabled: localStreamRef.current?.getAudioTracks().some((t) => t.enabled) || false,
+              isSpeaking,
+              audioContextState: audioCtxRef.current?.state || "uninitialized",
+            },
+            peers: {},
+          };
+
           for (const [targetId, pc] of Object.entries(pcRef.current)) {
-            const stats = await pc.getStats();
             let bytesReceived = 0;
             let bytesSent = 0;
             let packetsLost = 0;
             let jitter = 0;
+            let audioLevel = 0;
             let selectedCandidatePair: any = null;
 
-            stats.forEach((stat) => {
-              if (stat.type === "inbound-rtp" && stat.kind === "audio") {
-                bytesReceived = stat.bytesReceived || 0;
-                packetsLost = stat.packetsLost || 0;
-                jitter = stat.jitter || 0;
-              }
-              if (stat.type === "outbound-rtp" && stat.kind === "audio") {
-                bytesSent = stat.bytesSent || 0;
-              }
-              if (stat.type === "candidate-pair" && (stat.selected || stat.nominated)) {
-                selectedCandidatePair = {
-                  state: stat.state,
-                  currentRoundTripTime: stat.currentRoundTripTime,
-                };
-              }
-            });
+            try {
+              const stats = await pc.getStats();
+              stats.forEach((stat) => {
+                if (stat.type === "inbound-rtp" && stat.kind === "audio") {
+                  bytesReceived = stat.bytesReceived || 0;
+                  packetsLost = stat.packetsLost || 0;
+                  jitter = stat.jitter || 0;
+                  if (stat.audioLevel !== undefined) audioLevel = stat.audioLevel;
+                }
+                if (stat.type === "outbound-rtp" && stat.kind === "audio") {
+                  bytesSent = stat.bytesSent || 0;
+                }
+                if (stat.type === "candidate-pair" && (stat.selected || stat.nominated)) {
+                  selectedCandidatePair = {
+                    state: stat.state,
+                    currentRoundTripTime: stat.currentRoundTripTime,
+                    localCandidateType: stat.localCandidateType,
+                    remoteCandidateType: stat.remoteCandidateType,
+                  };
+                }
+              });
+            } catch {}
 
-            report[targetId] = {
+            const audioEl = audioElementsRef.current[targetId];
+
+            report.peers[targetId] = {
               name: peerNamesRef.current[targetId],
               connectionState: pc.connectionState,
               iceConnectionState: pc.iceConnectionState,
@@ -804,14 +946,23 @@ export function useVoiceChannel(
               bytesSent,
               packetsLost,
               jitter,
+              audioLevel,
               selectedCandidatePair,
+              audioPlayback: {
+                hasElement: !!audioEl,
+                paused: audioEl ? audioEl.paused : true,
+                muted: audioEl ? audioEl.muted : true,
+                volume: audioEl ? audioEl.volume : 0,
+                readyState: audioEl ? audioEl.readyState : 0,
+                hasSrcObject: !!audioEl?.srcObject,
+              },
             };
           }
           return report;
         },
       };
     }
-  }, []);
+  }, [isMicOn, isSpeaking]);
 
   return {
     peers,

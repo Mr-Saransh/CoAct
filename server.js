@@ -1444,6 +1444,9 @@ app.prepare().then(() => {
       const session = sessions.get(sessionId)
       if (!session) return
 
+      // Ensure socket is joined to sessionId room for voice broadcast reliability
+      socket.join(sessionId)
+
       if (!session.voicePeers) {
         session.voicePeers = new Map()
       }
