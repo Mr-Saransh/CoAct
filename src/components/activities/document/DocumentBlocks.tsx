@@ -1140,6 +1140,11 @@ const DiagramBlockContent: React.FC<{
     const node = data.nodes.find(n => n.id === nodeId);
     if (!node) return;
 
+    const currentEl = e.currentTarget as HTMLElement;
+    const rect = currentEl.getBoundingClientRect();
+    const nodeWidth = node.width || (node.shape === 'diamond' ? 95 : 100);
+    const effectiveScale = rect.width > 0 && nodeWidth > 0 ? (rect.width / nodeWidth) : 1;
+
     setDraggedNodeId(nodeId);
     setSelectedNodeId(nodeId);
     dragStartRef.current = {
@@ -1148,16 +1153,18 @@ const DiagramBlockContent: React.FC<{
       startY: e.clientY,
       nodeX: node.x,
       nodeY: node.y,
-    };
+      scale: effectiveScale > 0 ? effectiveScale : 1,
+    } as any;
   };
 
   const handleNodePointerMove = (e: React.PointerEvent) => {
     if (!draggedNodeId || !dragStartRef.current) return;
     e.stopPropagation();
 
-    const { id, startX, startY, nodeX, nodeY } = dragStartRef.current;
-    const deltaX = e.clientX - startX;
-    const deltaY = e.clientY - startY;
+    const { id, startX, startY, nodeX, nodeY, scale } = dragStartRef.current as any;
+    const effectiveScale = scale || 1;
+    const deltaX = (e.clientX - startX) / effectiveScale;
+    const deltaY = (e.clientY - startY) / effectiveScale;
 
     const newX = Math.max(10, Math.min(1200, Math.round(nodeX + deltaX)));
     const newY = Math.max(10, Math.min(600, Math.round(nodeY + deltaY)));
@@ -1655,7 +1662,8 @@ const DiagramBlockContent: React.FC<{
               onPointerDown={(e) => handleNodePointerDown(e, node.id)}
               onPointerMove={handleNodePointerMove}
               onPointerUp={handleNodePointerUp}
-              className={`absolute cursor-move transition-shadow flex items-center justify-center p-1.5 z-10 select-none ${
+              onPointerCancel={handleNodePointerUp}
+              className={`absolute cursor-move transition-shadow flex items-center justify-center p-1.5 z-10 select-none touch-none ${
                 isDragging ? 'shadow-2xl opacity-90 scale-102 z-25' : 'shadow-md'
               } ${
                 isSource ? 'ring-4 ring-amber-400 scale-105 z-30' : isSelectedNode && isEditing ? 'ring-2 ring-blue-500 z-20' : 'hover:ring-1 hover:ring-slate-400'

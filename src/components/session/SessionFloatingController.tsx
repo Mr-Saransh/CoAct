@@ -109,7 +109,7 @@ export const SessionFloatingController = React.memo(({
       dragElastic={0.05}
       dragConstraints={{ top: -600, bottom: 0, left: -600, right: 0 }}
       initial={{ x: 0, y: 0 }}
-      className="fixed z-[1000] touch-none right-4 sm:right-6 bottom-[calc(max(env(safe-area-inset-bottom,0px),0.75rem)+1.25rem)]"
+      className="fixed z-[1000] touch-none right-3 sm:right-6 bottom-[calc(max(env(safe-area-inset-bottom,0px),1rem)+4.25rem)] sm:bottom-6"
       onDragStart={handleInteraction}
       onDrag={handleInteraction}
     >
@@ -148,7 +148,7 @@ export const SessionFloatingController = React.memo(({
               animate={{ opacity: 1, scale: 1, y: 0 }}
               exit={{ opacity: 0, scale: 0.92, y: 16 }}
               transition={{ duration: 0.18, ease: "easeOut" }}
-              className="w-80 sm:w-84 max-w-[calc(100vw-2rem)] bg-slate-950/98 backdrop-blur-3xl border border-slate-700/80 rounded-2xl p-3.5 shadow-[0_20px_50px_rgba(0,0,0,0.95)] flex flex-col gap-3 text-white ring-1 ring-white/10"
+              className="w-80 sm:w-84 max-w-[calc(100vw-1.5rem)] max-h-[calc(100dvh-7rem)] overflow-y-auto custom-scrollbar bg-slate-950/98 backdrop-blur-3xl border border-slate-700/80 rounded-2xl p-3.5 shadow-[0_20px_50px_rgba(0,0,0,0.95)] flex flex-col gap-3 text-white ring-1 ring-white/10"
               onPointerDown={handleInteraction}
             >
               {/* Header: Title + Role Badge + Close */}

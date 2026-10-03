@@ -283,6 +283,20 @@ export const GroupDocumentStudio: React.FC<GroupDocumentStudioProps> = ({
     };
   }, [isMobile]);
 
+  // Prevent browser-level gesture zoom on mobile iOS/iPadOS so only document canvas zooms
+  useEffect(() => {
+    if (!isMobile) return;
+    const preventGesture = (e: Event) => {
+      e.preventDefault();
+    };
+    document.addEventListener("gesturestart", preventGesture, { passive: false });
+    document.addEventListener("gesturechange", preventGesture, { passive: false });
+    return () => {
+      document.removeEventListener("gesturestart", preventGesture);
+      document.removeEventListener("gesturechange", preventGesture);
+    };
+  }, [isMobile]);
+
   // Double tap to zoom in / fit page on mobile
   const lastTapRef = useRef<number>(0);
   const handleTouchEndCanvas = useCallback((e: React.TouchEvent) => {
@@ -1342,21 +1356,17 @@ export const GroupDocumentStudio: React.FC<GroupDocumentStudioProps> = ({
             <div 
               ref={containerRef}
               onTouchEnd={handleTouchEndCanvas}
-              className={`flex-1 h-full select-text relative transition-all ${
+              className={`flex-1 h-full select-text relative transition-all overflow-auto custom-scrollbar ${
                 isMobile
-                  ? isAtFit
-                    ? 'overflow-hidden flex flex-col items-center justify-center p-2'
-                    : 'overflow-auto custom-scrollbar flex flex-col items-center justify-start p-3 touch-pan-x touch-pan-y'
-                  : 'overflow-auto custom-scrollbar p-4 sm:p-8 flex flex-col items-center'
+                  ? 'p-2 sm:p-4 touch-pan-x touch-pan-y overscroll-contain flex flex-col'
+                  : 'p-4 sm:p-8 flex flex-col items-center'
               }`}
               onClick={() => setSelectedBlockId(null)}
             >
               {isMobile ? (
-                /* Mobile Outer Sizer (Section 2, 4, 6): exact scaled dimensions prevent layout overflow & center the page */
+                /* Mobile Outer Sizer: m-auto centers when smaller, aligns to 0,0 when zoomed so no clipping occurs */
                 <div 
-                  className={`relative shrink-0 flex items-center justify-center transition-all ${
-                    isAtFit ? 'my-auto' : 'my-2'
-                  }`}
+                  className="relative shrink-0 m-auto transition-all"
                   style={{
                     width: `${scaledWidth}px`,
                     height: `${scaledHeight}px`,

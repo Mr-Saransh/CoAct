@@ -77,8 +77,18 @@ export const DocumentPage: React.FC<DocumentPageProps> = ({
   const marginPx = MARGIN_VALUES[settings.margins] || 48;
 
   // Active Dragging State for Positioned Blocks
-  const [draggingBlockId, setDraggingBlockId] = useState<string | null>(null);
-  const dragStartRef = useRef<{ startX: number; startY: number; blockX: number; blockY: number } | null>(null);
+  const [localDrag, setLocalDrag] = useState<{ blockId: string; x: number; y: number } | null>(null);
+  const dragRef = useRef<{
+    blockId: string;
+    startX: number;
+    startY: number;
+    initialX: number;
+    initialY: number;
+    blockWidth: number;
+    blockHeight: number;
+    currentX: number;
+    currentY: number;
+  } | null>(null);
 
   // Check overflow
   useEffect(() => {
@@ -113,53 +123,85 @@ export const DocumentPage: React.FC<DocumentPageProps> = ({
     }
 
     e.stopPropagation();
-    try {
-      (e.target as HTMLElement).setPointerCapture(e.pointerId);
-    } catch (err) {}
 
-    setDraggingBlockId(block.id);
-    dragStartRef.current = {
+    const currentEl = e.currentTarget as HTMLElement;
+    const rect = currentEl.getBoundingClientRect();
+    const effectiveZoom = zoom && zoom > 0 ? zoom : 1;
+    const measuredWidth = Math.round(rect.width / effectiveZoom);
+    const measuredHeight = Math.round(rect.height / effectiveZoom);
+
+    const initialX = block.x !== undefined ? block.x : marginPx;
+    const initialY = block.y !== undefined ? block.y : marginPx;
+    const blockWidth = block.width || measuredWidth || 180;
+    const blockHeight = block.height || measuredHeight || 80;
+
+    dragRef.current = {
+      blockId: block.id,
       startX: e.clientX,
       startY: e.clientY,
-      blockX: block.x || marginPx,
-      blockY: block.y || marginPx,
+      initialX,
+      initialY,
+      blockWidth,
+      blockHeight,
+      currentX: initialX,
+      currentY: initialY,
     };
+
+    setLocalDrag({ blockId: block.id, x: initialX, y: initialY });
+    onSelectBlock(block.id);
+
+    try {
+      currentEl.setPointerCapture(e.pointerId);
+    } catch {}
   };
 
   const handlePointerMove = (e: React.PointerEvent, block: DocumentBlock) => {
-    if (!draggingBlockId || draggingBlockId !== block.id || !dragStartRef.current) return;
+    if (!dragRef.current || dragRef.current.blockId !== block.id) return;
     e.stopPropagation();
 
-    // Canonical world delta calculation: viewport transform respected
     const effectiveZoom = zoom && zoom > 0 ? zoom : 1;
-    const deltaX = (e.clientX - dragStartRef.current.startX) / effectiveZoom;
-    const deltaY = (e.clientY - dragStartRef.current.startY) / effectiveZoom;
+    const deltaX = (e.clientX - dragRef.current.startX) / effectiveZoom;
+    const deltaY = (e.clientY - dragRef.current.startY) / effectiveZoom;
 
-    const rawX = dragStartRef.current.blockX + deltaX;
-    const rawY = dragStartRef.current.blockY + deltaY;
+    const rawX = dragRef.current.initialX + deltaX;
+    const rawY = dragRef.current.initialY + deltaY;
 
-    // Clamping to paper margin bounds
-    const blockWidth = block.width || 180;
-    const blockHeight = block.height || 80;
-
-    const minX = marginPx;
-    const maxX = Math.max(minX, dims.width - marginPx - blockWidth);
-    const minY = marginPx + 30;
-    const maxY = Math.max(minY, dims.height - marginPx - blockHeight - 30);
+    // Strict boundary clamping: blocks NEVER get out of paper boundaries
+    const minX = 4;
+    const maxX = Math.max(minX, dims.width - dragRef.current.blockWidth - 4);
+    const minY = 4;
+    const maxY = Math.max(minY, dims.height - dragRef.current.blockHeight - 4);
 
     const clampedX = Math.round(Math.max(minX, Math.min(maxX, rawX)));
     const clampedY = Math.round(Math.max(minY, Math.min(maxY, rawY)));
 
-    onBlockMovePositioned(block.id, clampedX, clampedY);
+    dragRef.current.currentX = clampedX;
+    dragRef.current.currentY = clampedY;
+
+    setLocalDrag({ blockId: block.id, x: clampedX, y: clampedY });
   };
 
-  const handlePointerUp = (e: React.PointerEvent) => {
-    if (draggingBlockId) {
+  const handlePointerUp = (e: React.PointerEvent, block: DocumentBlock) => {
+    if (dragRef.current && dragRef.current.blockId === block.id) {
       try {
-        (e.target as HTMLElement).releasePointerCapture(e.pointerId);
-      } catch (err) {}
-      setDraggingBlockId(null);
-      dragStartRef.current = null;
+        (e.currentTarget as HTMLElement).releasePointerCapture(e.pointerId);
+      } catch {}
+      const { blockId, currentX, currentY } = dragRef.current;
+      onBlockMovePositioned(blockId, currentX, currentY);
+      dragRef.current = null;
+      setLocalDrag(null);
+    }
+  };
+
+  const handlePointerCancel = (e: React.PointerEvent, block: DocumentBlock) => {
+    if (dragRef.current && dragRef.current.blockId === block.id) {
+      try {
+        (e.currentTarget as HTMLElement).releasePointerCapture(e.pointerId);
+      } catch {}
+      const { blockId, currentX, currentY } = dragRef.current;
+      onBlockMovePositioned(blockId, currentX, currentY);
+      dragRef.current = null;
+      setLocalDrag(null);
     }
   };
 
@@ -180,17 +222,22 @@ export const DocumentPage: React.FC<DocumentPageProps> = ({
     if (!canEdit || block.locked) return;
     e.stopPropagation();
     try {
-      (e.target as HTMLElement).setPointerCapture(e.pointerId);
+      (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
     } catch (err) {}
+
+    const effectiveZoom = zoom && zoom > 0 ? zoom : 1;
+    const currentEl = e.currentTarget.parentElement as HTMLElement | null;
+    const measuredW = currentEl ? Math.round(currentEl.getBoundingClientRect().width / effectiveZoom) : 180;
+    const measuredH = currentEl ? Math.round(currentEl.getBoundingClientRect().height / effectiveZoom) : 80;
 
     setResizingBlockId(block.id);
     resizeStartRef.current = {
       startX: e.clientX,
       startY: e.clientY,
-      initialX: block.x || marginPx,
-      initialY: block.y || marginPx,
-      initialW: block.width || 180,
-      initialH: block.height || 80,
+      initialX: block.x !== undefined ? block.x : marginPx,
+      initialY: block.y !== undefined ? block.y : marginPx,
+      initialW: block.width || measuredW || 180,
+      initialH: block.height || measuredH || 80,
       direction,
     };
   };
@@ -206,10 +253,10 @@ export const DocumentPage: React.FC<DocumentPageProps> = ({
 
     const minW = block.type === 'shape' ? 40 : 60;
     const minH = block.type === 'shape' ? 30 : 40;
-    const minBoundX = marginPx;
-    const maxBoundX = dims.width - marginPx;
-    const minBoundY = marginPx + 20;
-    const maxBoundY = dims.height - marginPx - 20;
+    const minBoundX = 4;
+    const maxBoundX = dims.width - 4;
+    const minBoundY = 4;
+    const maxBoundY = dims.height - 4;
 
     let newX = initialX;
     let newY = initialY;
@@ -266,7 +313,17 @@ export const DocumentPage: React.FC<DocumentPageProps> = ({
   const handleResizePointerUp = (e: React.PointerEvent) => {
     if (resizingBlockId) {
       try {
-        (e.target as HTMLElement).releasePointerCapture(e.pointerId);
+        (e.currentTarget as HTMLElement).releasePointerCapture(e.pointerId);
+      } catch (err) {}
+      setResizingBlockId(null);
+      resizeStartRef.current = null;
+    }
+  };
+
+  const handleResizePointerCancel = (e: React.PointerEvent) => {
+    if (resizingBlockId) {
+      try {
+        (e.currentTarget as HTMLElement).releasePointerCapture(e.pointerId);
       } catch (err) {}
       setResizingBlockId(null);
       resizeStartRef.current = null;
@@ -456,20 +513,26 @@ export const DocumentPage: React.FC<DocumentPageProps> = ({
         {/* Positioned Blocks Layer */}
         {positionedBlocks.map((block) => {
           const isSelected = selectedBlockId === block.id;
+          const isDragging = localDrag?.blockId === block.id;
+          const currentX = isDragging ? localDrag.x : (block.x !== undefined ? block.x : marginPx);
+          const currentY = isDragging ? localDrag.y : (block.y !== undefined ? block.y : marginPx);
 
           return (
             <div
               key={block.id}
               onPointerDown={(e) => handlePointerDown(e, block)}
               onPointerMove={(e) => handlePointerMove(e, block)}
-              onPointerUp={handlePointerUp}
-              className={`absolute group/positioned ${block.locked ? 'cursor-default' : 'cursor-move'} ${draggingBlockId === block.id ? 'opacity-90' : ''}`}
+              onPointerUp={(e) => handlePointerUp(e, block)}
+              onPointerCancel={(e) => handlePointerCancel(e, block)}
+              className={`absolute group/positioned touch-none select-none ${
+                block.locked ? 'cursor-default' : 'cursor-move'
+              } ${isDragging ? 'opacity-95 shadow-2xl scale-[1.01]' : ''}`}
               style={{
-                left: `${block.x || marginPx}px`,
-                top: `${block.y || marginPx}px`,
+                left: `${currentX}px`,
+                top: `${currentY}px`,
                 width: block.width ? `${block.width}px` : undefined,
                 height: block.height ? `${block.height}px` : undefined,
-                zIndex: block.zIndex || (isSelected ? 35 : 25),
+                zIndex: isDragging ? 60 : (block.zIndex || (isSelected ? 35 : 25)),
               }}
             >
               <DocumentBlockRenderer
@@ -494,6 +557,7 @@ export const DocumentPage: React.FC<DocumentPageProps> = ({
                     onPointerDown={(e) => handleResizePointerDown(e, block, 'nw')}
                     onPointerMove={(e) => handleResizePointerMove(e, block)}
                     onPointerUp={handleResizePointerUp}
+                    onPointerCancel={handleResizePointerCancel}
                     className="absolute -top-1.5 -left-1.5 w-3.5 h-3.5 bg-blue-600 border-2 border-white rounded-full cursor-nwse-resize shadow-md z-50 hover:scale-125 transition-transform touch-none select-none before:content-[''] before:absolute before:-inset-3 sm:before:-inset-2 before:rounded-full"
                     title="Resize Top-Left"
                   />
@@ -502,6 +566,7 @@ export const DocumentPage: React.FC<DocumentPageProps> = ({
                     onPointerDown={(e) => handleResizePointerDown(e, block, 'n')}
                     onPointerMove={(e) => handleResizePointerMove(e, block)}
                     onPointerUp={handleResizePointerUp}
+                    onPointerCancel={handleResizePointerCancel}
                     className="absolute -top-1.5 left-1/2 -translate-x-1/2 w-3.5 h-3.5 bg-blue-600 border-2 border-white rounded-full cursor-ns-resize shadow-md z-50 hover:scale-125 transition-transform touch-none select-none before:content-[''] before:absolute before:-inset-3 sm:before:-inset-2 before:rounded-full"
                     title="Resize Top"
                   />
@@ -510,6 +575,7 @@ export const DocumentPage: React.FC<DocumentPageProps> = ({
                     onPointerDown={(e) => handleResizePointerDown(e, block, 'ne')}
                     onPointerMove={(e) => handleResizePointerMove(e, block)}
                     onPointerUp={handleResizePointerUp}
+                    onPointerCancel={handleResizePointerCancel}
                     className="absolute -top-1.5 -right-1.5 w-3.5 h-3.5 bg-blue-600 border-2 border-white rounded-full cursor-nesw-resize shadow-md z-50 hover:scale-125 transition-transform touch-none select-none before:content-[''] before:absolute before:-inset-3 sm:before:-inset-2 before:rounded-full"
                     title="Resize Top-Right"
                   />
@@ -518,6 +584,7 @@ export const DocumentPage: React.FC<DocumentPageProps> = ({
                     onPointerDown={(e) => handleResizePointerDown(e, block, 'e')}
                     onPointerMove={(e) => handleResizePointerMove(e, block)}
                     onPointerUp={handleResizePointerUp}
+                    onPointerCancel={handleResizePointerCancel}
                     className="absolute top-1/2 -translate-y-1/2 -right-1.5 w-3.5 h-3.5 bg-blue-600 border-2 border-white rounded-full cursor-ew-resize shadow-md z-50 hover:scale-125 transition-transform touch-none select-none before:content-[''] before:absolute before:-inset-3 sm:before:-inset-2 before:rounded-full"
                     title="Resize Right"
                   />
@@ -526,6 +593,7 @@ export const DocumentPage: React.FC<DocumentPageProps> = ({
                     onPointerDown={(e) => handleResizePointerDown(e, block, 'se')}
                     onPointerMove={(e) => handleResizePointerMove(e, block)}
                     onPointerUp={handleResizePointerUp}
+                    onPointerCancel={handleResizePointerCancel}
                     className="absolute -bottom-1.5 -right-1.5 w-3.5 h-3.5 bg-blue-600 border-2 border-white rounded-full cursor-nwse-resize shadow-md z-50 hover:scale-125 transition-transform touch-none select-none before:content-[''] before:absolute before:-inset-3 sm:before:-inset-2 before:rounded-full"
                     title="Resize Bottom-Right"
                   />
@@ -534,6 +602,7 @@ export const DocumentPage: React.FC<DocumentPageProps> = ({
                     onPointerDown={(e) => handleResizePointerDown(e, block, 's')}
                     onPointerMove={(e) => handleResizePointerMove(e, block)}
                     onPointerUp={handleResizePointerUp}
+                    onPointerCancel={handleResizePointerCancel}
                     className="absolute -bottom-1.5 left-1/2 -translate-x-1/2 w-3.5 h-3.5 bg-blue-600 border-2 border-white rounded-full cursor-ns-resize shadow-md z-50 hover:scale-125 transition-transform touch-none select-none before:content-[''] before:absolute before:-inset-3 sm:before:-inset-2 before:rounded-full"
                     title="Resize Bottom"
                   />
@@ -542,6 +611,7 @@ export const DocumentPage: React.FC<DocumentPageProps> = ({
                     onPointerDown={(e) => handleResizePointerDown(e, block, 'sw')}
                     onPointerMove={(e) => handleResizePointerMove(e, block)}
                     onPointerUp={handleResizePointerUp}
+                    onPointerCancel={handleResizePointerCancel}
                     className="absolute -bottom-1.5 -left-1.5 w-3.5 h-3.5 bg-blue-600 border-2 border-white rounded-full cursor-nesw-resize shadow-md z-50 hover:scale-125 transition-transform touch-none select-none before:content-[''] before:absolute before:-inset-3 sm:before:-inset-2 before:rounded-full"
                     title="Resize Bottom-Left"
                   />
@@ -550,6 +620,7 @@ export const DocumentPage: React.FC<DocumentPageProps> = ({
                     onPointerDown={(e) => handleResizePointerDown(e, block, 'w')}
                     onPointerMove={(e) => handleResizePointerMove(e, block)}
                     onPointerUp={handleResizePointerUp}
+                    onPointerCancel={handleResizePointerCancel}
                     className="absolute top-1/2 -translate-y-1/2 -left-1.5 w-3.5 h-3.5 bg-blue-600 border-2 border-white rounded-full cursor-ew-resize shadow-md z-50 hover:scale-125 transition-transform touch-none select-none before:content-[''] before:absolute before:-inset-3 sm:before:-inset-2 before:rounded-full"
                     title="Resize Left"
                   />

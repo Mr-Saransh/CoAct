@@ -21,8 +21,8 @@ export function GroupStudyHost({
 
   return (
     <div className="w-full h-full flex flex-col bg-[#0b0f19] text-white overflow-hidden relative">
-      {/* Floating Sub-Tab Toggle in top-right corner to access study companion tools */}
-      <div className="absolute top-2.5 right-36 z-50 flex items-center bg-slate-900/90 border border-slate-700/80 rounded-lg p-0.5 shadow-xl backdrop-blur-md">
+      {/* Desktop Sub-Tab Toggle in top-right corner */}
+      <div className="absolute top-2.5 right-36 z-50 hidden sm:flex items-center bg-slate-900/90 border border-slate-700/80 rounded-lg p-0.5 shadow-xl backdrop-blur-md">
         <button
           onClick={() => setActiveTab("document")}
           className={`px-2.5 py-1 rounded-md text-xs font-semibold flex items-center gap-1.5 transition-all ${
@@ -33,7 +33,7 @@ export function GroupStudyHost({
           title="Document Studio"
         >
           <FileText className="w-3.5 h-3.5" />
-          <span className="hidden sm:inline">Document</span>
+          <span>Document</span>
         </button>
         <button
           onClick={() => setActiveTab("focus_tasks")}
@@ -45,7 +45,33 @@ export function GroupStudyHost({
           title="Session Focus & Tasks"
         >
           <Timer className="w-3.5 h-3.5" />
-          <span className="hidden sm:inline">Focus & Tasks</span>
+          <span>Focus & Tasks</span>
+        </button>
+      </div>
+
+      {/* Mobile Floating Sub-Tab Toggle (Elevated at bottom-left so it never blocks top toolbar or bottom browser bars) */}
+      <div className="fixed bottom-[calc(max(env(safe-area-inset-bottom,0px),1rem)+4.25rem)] left-3 z-40 sm:hidden flex items-center bg-slate-950/95 border border-slate-700/80 rounded-full p-1 shadow-2xl backdrop-blur-2xl">
+        <button
+          onClick={() => setActiveTab("document")}
+          className={`px-2.5 py-1.5 rounded-full text-xs font-bold flex items-center gap-1.5 transition-all ${
+            activeTab === "document"
+              ? "bg-blue-600 text-white shadow-sm"
+              : "text-slate-400 hover:text-white"
+          }`}
+        >
+          <FileText className="w-3.5 h-3.5" />
+          <span>Doc</span>
+        </button>
+        <button
+          onClick={() => setActiveTab("focus_tasks")}
+          className={`px-2.5 py-1.5 rounded-full text-xs font-bold flex items-center gap-1.5 transition-all ${
+            activeTab === "focus_tasks"
+              ? "bg-blue-600 text-white shadow-sm"
+              : "text-slate-400 hover:text-white"
+          }`}
+        >
+          <Timer className="w-3.5 h-3.5" />
+          <span>Focus</span>
         </button>
       </div>
 
@@ -103,8 +129,8 @@ export function GroupStudyParticipant({
 
   return (
     <div className="w-full h-full flex flex-col bg-[#0b0f19] text-white overflow-hidden relative">
-      {/* Floating Sub-Tab Toggle in top-right corner to access study companion tools */}
-      <div className="absolute top-2.5 right-36 z-50 flex items-center bg-slate-900/90 border border-slate-700/80 rounded-lg p-0.5 shadow-xl backdrop-blur-md">
+      {/* Desktop Sub-Tab Toggle in top-right corner */}
+      <div className="absolute top-2.5 right-36 z-50 hidden sm:flex items-center bg-slate-900/90 border border-slate-700/80 rounded-lg p-0.5 shadow-xl backdrop-blur-md">
         <button
           onClick={() => setActiveTab("document")}
           className={`px-2.5 py-1 rounded-md text-xs font-semibold flex items-center gap-1.5 transition-all ${
@@ -115,7 +141,7 @@ export function GroupStudyParticipant({
           title="Document Studio"
         >
           <FileText className="w-3.5 h-3.5" />
-          <span className="hidden sm:inline">Document</span>
+          <span>Document</span>
         </button>
         <button
           onClick={() => setActiveTab("focus_tasks")}
@@ -127,7 +153,33 @@ export function GroupStudyParticipant({
           title="Session Focus & Tasks"
         >
           <Timer className="w-3.5 h-3.5" />
-          <span className="hidden sm:inline">Focus & Tasks</span>
+          <span>Focus & Tasks</span>
+        </button>
+      </div>
+
+      {/* Mobile Floating Sub-Tab Toggle (Elevated at bottom-left so it never blocks top toolbar or bottom browser bars) */}
+      <div className="fixed bottom-[calc(max(env(safe-area-inset-bottom,0px),1rem)+4.25rem)] left-3 z-40 sm:hidden flex items-center bg-slate-950/95 border border-slate-700/80 rounded-full p-1 shadow-2xl backdrop-blur-2xl">
+        <button
+          onClick={() => setActiveTab("document")}
+          className={`px-2.5 py-1.5 rounded-full text-xs font-bold flex items-center gap-1.5 transition-all ${
+            activeTab === "document"
+              ? "bg-blue-600 text-white shadow-sm"
+              : "text-slate-400 hover:text-white"
+          }`}
+        >
+          <FileText className="w-3.5 h-3.5" />
+          <span>Doc</span>
+        </button>
+        <button
+          onClick={() => setActiveTab("focus_tasks")}
+          className={`px-2.5 py-1.5 rounded-full text-xs font-bold flex items-center gap-1.5 transition-all ${
+            activeTab === "focus_tasks"
+              ? "bg-blue-600 text-white shadow-sm"
+              : "text-slate-400 hover:text-white"
+          }`}
+        >
+          <Timer className="w-3.5 h-3.5" />
+          <span>Focus</span>
         </button>
       </div>
 
